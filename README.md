@@ -15,13 +15,13 @@ ES modules need a web server, so opening the file directly with `file://` won't 
 
 ## Hosting
 
-GitHub Pages serves the `main` branch at **https://framecraft.syntaxrewrite.com** (set by the `CNAME` file). DNS for `syntaxrewrite.com` is at Namecheap and needs one record:
+GitHub Pages serves the `main` branch at https://subtoferalsloth11.github.io/framecraft/. The target domain is **framecraft.syntaxrewrite.com**. DNS for `syntaxrewrite.com` is at Namecheap and needs one record:
 
 | Type | Host | Value |
 |---|---|---|
 | CNAME | `framecraft` | `subtoferalsloth11.github.io.` |
 
-Once the record resolves, GitHub issues the HTTPS certificate. Then turn on Settings → Pages → Enforce HTTPS.
+Once that record resolves, the launchd job `com.framecraft.domain-watch` on the dev Mac (`~/.framecraft/domain-watch.sh`, checks every 5 minutes) commits the `CNAME` file, sets the Pages custom domain, enforces HTTPS once GitHub has issued the certificate, and then removes itself. Log: `~/.framecraft/domain-watch.log`.
 
 ## Getting paid
 
