@@ -112,6 +112,14 @@ const ICONS = {
   title: P('M4 7V4h16v3M9 20h6M12 4v16'),
   palette: '<circle cx="12" cy="12" r="9"/><circle cx="8" cy="10" r="1.2"/><circle cx="12" cy="7" r="1.2"/><circle cx="16" cy="10" r="1.2"/>' + P('M12 21a3 3 0 0 1 0-6h2'),
   greenscreen: '<rect x="2" y="4" width="20" height="16" rx="2"/>' + P('M8 20v-3a4 4 0 0 1 8 0v3') + '<circle cx="12" cy="10" r="2.5"/>',
+  // --- photo additions ---
+  minus: P('M5 12h14'),
+  // --- end photo additions ---
+  // --- video additions ---
+  ripple: P('M3 5h10M5 5l1 14h4l1-14M21 12h-7M17 9l-3 3 3 3'),
+  zoomOut: '<circle cx="11" cy="11" r="7"/>' + P('m21 21-5-5M8 11h6'),
+  warn: P('M12 3 2 20h20zM12 10v4M12 17v.5'),
+  pin: P('M9 3h6M10 3v6l-3 4h10l-3-4V3M12 13v8'),
 };
 
 export function icon(name, size = 18) {
