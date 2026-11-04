@@ -1,5 +1,5 @@
 // Layers and History panels.
-import { el } from '../ui.js';
+import { el, modal } from '../ui.js';
 import { CONFIG } from '../config.js';
 import { License } from '../license.js';
 import { BLEND_MODES } from './doc.js';
@@ -8,6 +8,33 @@ import { iconEl } from '../icons.js';
 const BLEND_LABELS = { normal: 'Normal', multiply: 'Multiply', screen: 'Screen', overlay: 'Overlay', darken: 'Darken', lighten: 'Lighten',
   'color-dodge': 'Color dodge', 'color-burn': 'Color burn', 'hard-light': 'Hard light', 'soft-light': 'Soft light', difference: 'Difference',
   exclusion: 'Exclusion', hue: 'Hue', saturation: 'Saturation', color: 'Color', luminosity: 'Luminosity' };
+
+const COARSE = matchMedia('(pointer: coarse)');
+
+// Long-press (touch / pen) calls fn; also covers Android's long-press contextmenu. The click that
+// follows a long-press is swallowed so it doesn't also activate the row.
+function onLongPress(node, fn) {
+  let timer = 0, sx = 0, sy = 0, fired = false, type = 'mouse';
+  const stop = () => { clearTimeout(timer); timer = 0; };
+  const fire = () => { stop(); fired = true; fn(); };
+  node.addEventListener('pointerdown', (e) => {
+    type = e.pointerType;
+    fired = false;
+    if (type === 'mouse') return;
+    sx = e.clientX; sy = e.clientY;
+    stop();
+    timer = setTimeout(fire, 500);
+  });
+  node.addEventListener('pointermove', (e) => { if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > 10) stop(); });
+  node.addEventListener('pointerup', stop);
+  node.addEventListener('pointercancel', stop);
+  node.addEventListener('contextmenu', (e) => {
+    if (type === 'mouse') return;
+    e.preventDefault();
+    if (!fired) fire();
+  });
+  node.addEventListener('click', (e) => { if (fired) { fired = false; e.preventDefault(); e.stopPropagation(); } }, true);
+}
 
 function thumb(layer, doc) {
   const T = 36;
@@ -48,9 +75,46 @@ export function createLayersPanel(ed) {
 
   let dragFrom = -1;
 
+  function renameDialog(l) {
+    const d = ed.doc;
+    const input = el('input', { type: 'text', value: l.name, class: 'pe-rename-input', enterkeyhint: 'done', 'aria-label': 'Layer name' });
+    const save = () => {
+      const v = input.value.trim();
+      dlg.close();
+      if (v && v !== l.name && ed.doc === d && d.layers.includes(l)) { l.name = v; d.changed('layers'); d.history.push('Rename layer'); }
+    };
+    input.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); save(); } });
+    const dlg = modal('Rename layer', el('div', { class: 'modal-body pe-dlg' }, input,
+      el('div', { class: 'row' }, el('div', { class: 'spacer' }),
+        el('button', { class: 'btn', onclick: () => dlg.close() }, 'Cancel'),
+        el('button', { class: 'btn primary', onclick: save }, iconEl('check', 16), 'Rename'))));
+    input.focus();
+    input.select();
+  }
+
+  // Layer actions sheet (long-press on a row).
+  function actions(i) {
+    const d = ed.doc;
+    if (!d || !d.layers[i]) return;
+    if (d.active !== i) { d.active = i; ed.emit('layers'); ed.render(); }
+    const l = d.layers[i], top = d.layers.length - 1;
+    const act = (iconName, label, fn, { disabled = false, danger = false } = {}) => el('button', {
+      class: `btn pe-action${danger ? ' danger' : ''}`, disabled, onclick: () => { dlg.close(); fn(); } }, iconEl(iconName), label);
+    const toggle = (key, on, off) => () => { l[key] = !l[key]; d.changed('layers'); d.history.push(l[key] ? on : off); };
+    const dlg = modal(l.name, el('div', { class: 'modal-body pe-dlg pe-actions' },
+      act('text', 'Rename', () => renameDialog(l)),
+      act('copy', 'Duplicate', () => ed.cmd('duplicateLayer')),
+      act('merge', 'Merge down', () => ed.cmd('mergeDown'), { disabled: i === 0 }),
+      act('up', 'Move up', () => ed.cmd('layerUp'), { disabled: i === top }),
+      act('down', 'Move down', () => ed.cmd('layerDown'), { disabled: i === 0 }),
+      act(l.visible ? 'eyeOff' : 'eye', l.visible ? 'Hide' : 'Show', toggle('visible', 'Show layer', 'Hide layer')),
+      act(l.locked ? 'unlock' : 'lock', l.locked ? 'Unlock' : 'Lock', toggle('locked', 'Lock layer', 'Unlock layer')),
+      act('trash', 'Delete', () => ed.cmd('deleteLayer'), { disabled: d.layers.length <= 1, danger: true })));
+  }
+
   function row(l, i) {
     const d = ed.doc;
-    const name = el('span', { class: 'pe-layer-name', title: 'Double-click to rename' }, l.name);
+    const name = el('span', { class: 'pe-layer-name', title: COARSE.matches ? 'Long-press for layer actions' : 'Double-click to rename' }, l.name);
     name.addEventListener('dblclick', (e) => {
       e.stopPropagation();
       const input = el('input', { type: 'text', value: l.name, class: 'pe-rename' });
@@ -64,7 +128,7 @@ export function createLayersPanel(ed) {
       input.focus();
       input.select();
     });
-    const r = el('div', { class: `pe-layer${i === d.active ? ' active' : ''}${l.visible ? '' : ' off'}`, draggable: true,
+    const r = el('div', { class: `pe-layer${i === d.active ? ' active' : ''}${l.visible ? '' : ' off'}`, draggable: !COARSE.matches,
       onclick: () => { if (d.active !== i) { d.active = i; ed.emit('layers'); ed.render(); } } },
       el('button', { class: 'icon-btn pe-eye', title: l.visible ? 'Hide layer' : 'Show layer',
         onclick: (e) => { e.stopPropagation(); l.visible = !l.visible; d.changed('layers'); d.history.push(l.visible ? 'Show layer' : 'Hide layer'); } }, iconEl(l.visible ? 'eye' : 'eyeOff')),
@@ -84,6 +148,7 @@ export function createLayersPanel(ed) {
       dragFrom = -1;
     });
     r.addEventListener('dragend', () => { dragFrom = -1; });
+    onLongPress(r, () => actions(i));
     return r;
   }
 
@@ -129,5 +194,5 @@ export function createHistoryPanel(ed) {
   ed.on('doc', render);
   render();
   return el('div', { class: 'pe-history' }, list,
-    el('div', { class: 'pe-small muted' }, `Keeps the last ${ed.doc?.history.max ?? 30} steps · click a step to jump`));
+    el('div', { class: 'pe-small muted' }, `Keeps the last ${ed.doc?.history.max ?? 30} steps · tap or click a step to jump`));
 }

@@ -1,5 +1,6 @@
 // Selection tools (marquees, lasso, magic wand), Move and Crop.
 import { toast } from '../ui.js';
+import { iconEl } from '../icons.js';
 import { floodMask } from './pixels.js';
 import { rectFrom } from './canvas.js';
 import { optRange, optCheck, optSelect, selModeSeg, modeFromEvent, hint, optButton } from './opts.js';
@@ -42,6 +43,7 @@ function marquee(id, name, key, icon, ellipse) {
     id, name, key, icon, cursor: 'crosshair', defaults: { mode: 'replace' },
     options: (ed) => [selModeSeg(ed, id), ...selectionButtons(ed), hint('Shift: square · Alt: from center · Shift/Alt on click: add/subtract')],
     down(ed, e, p) { this.a = p; this.r = null; this.mode = modeFromEvent(e, ed.opts[id].mode); },
+    abort() { this.a = null; this.r = null; },
     move(ed, e, p) { if (this.a) { this.r = dragRect(this.a, p, e.shiftKey, e.altKey); ed.render(); } },
     up(ed) {
       const sel = ed.doc.selection, r = this.r;
@@ -65,6 +67,7 @@ export const lasso = {
   id: 'lasso', name: 'Lasso', key: 'L', icon: 'lasso', cursor: 'crosshair', defaults: { mode: 'replace' },
   options: (ed) => [selModeSeg(ed, 'lasso'), ...selectionButtons(ed), hint('Drag a freehand outline; release to close it')],
   down(ed, e, p) { this.pts = [[p.x, p.y]]; this.mode = modeFromEvent(e, ed.opts.lasso.mode); },
+  abort() { this.pts = null; },
   move(ed, e, p) {
     if (!this.pts) return;
     const [lx, ly] = this.pts[this.pts.length - 1];
@@ -73,6 +76,7 @@ export const lasso = {
   up(ed) {
     const pts = this.pts;
     this.pts = null;
+    if (!pts) return;
     if (pts.length < 3) { if (this.mode === 'replace') ed.doc.selection.clear(); }
     else ed.doc.selection.polygon(this.mode, pts);
     ed.render();
@@ -158,6 +162,16 @@ export const move = {
     this.shift(ed, dx, dy);
   },
   up(ed) { if (this.layer) { this.start = null; this.end(ed); } },
+  abort(ed) {
+    if (!this.layer) return;
+    const d = ed.doc, L = this.layer.ctx;
+    L.clearRect(0, 0, d.width, d.height);
+    L.drawImage(this.backup.canvas, 0, 0);
+    ed.view.selOffset = null;
+    this.layer = null;
+    this.start = null;
+    d.changed('pixels');
+  },
   keydown(ed, e) {
     const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
     if (!dir || this.layer) return false;
@@ -176,7 +190,7 @@ export const crop = {
   id: 'crop', name: 'Crop', key: 'C', icon: 'crop', cursor: 'crosshair', defaults: { ratio: 'free' },
   options: (ed) => [
     optSelect(ed, 'crop', 'ratio', 'Ratio', Object.keys(RATIOS).map((k) => [k, k === 'free' ? 'Free' : k === 'original' ? 'Original' : k])),
-    optButton('✓ Apply', () => crop.apply(ed), { class: 'btn primary', title: 'Enter' }),
+    optButton([iconEl('check', 16), 'Apply'], () => crop.apply(ed), { class: 'btn primary', title: 'Enter' }),
     optButton('Cancel', () => crop.reset(ed), { title: 'Esc' }),
     hint('Drag handles or draw a new box. Enter applies.'),
   ],
@@ -190,8 +204,9 @@ export const crop = {
   },
   down(ed, e, p) {
     if (!this.rect) this.reset(ed);
-    const r = this.rect, z = ed.view.zoom, hp = this.handlePos(r);
-    const hit = HANDLES.find((h) => Math.hypot((hp[h][0] - p.x) * z, (hp[h][1] - p.y) * z) < 9);
+    const r = this.rect, z = ed.view.zoom, hp = this.handlePos(r), reach = e.pointerType === 'touch' ? 24 : 9;
+    this.prev = { ...r };
+    const hit = HANDLES.find((h) => Math.hypot((hp[h][0] - p.x) * z, (hp[h][1] - p.y) * z) < reach);
     if (hit) this.drag = { type: 'resize', h: hit, r0: { ...r } };
     else if (p.x > r.x && p.y > r.y && p.x < r.x + r.w && p.y < r.y + r.h) this.drag = { type: 'move', p0: p, r0: { ...r } };
     else this.drag = { type: 'new', a: p };
@@ -223,6 +238,7 @@ export const crop = {
     ed.render();
   },
   up() { this.drag = null; },
+  abort() { if (this.drag) { this.rect = this.prev; this.drag = null; } },
   hover(ed, e, p) {
     if (!this.rect) return;
     const z = ed.view.zoom, hp = this.handlePos(this.rect);

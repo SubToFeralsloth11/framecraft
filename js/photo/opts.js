@@ -1,5 +1,6 @@
 // Compact option widgets for the tool options bar. Values live in ed.opts[toolId][key].
 import { el } from '../ui.js';
+import { iconEl } from '../icons.js';
 
 const get = (ed, tool, key) => ed.opts[tool][key];
 function set(ed, tool, key, v) {
@@ -45,7 +46,7 @@ export function optSeg(ed, tool, key, options, label) {
   const wrap = el('div', { class: 'pe-seg' });
   const render = () => wrap.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.v === String(get(ed, tool, key))));
   for (const [v, t, title] of options) {
-    wrap.append(el('button', { 'data-v': String(v), title: title || '', onclick: () => { set(ed, tool, key, v); render(); } }, t));
+    wrap.append(el('button', { 'data-v': String(v), title: title || '', 'aria-label': title || null, onclick: () => { set(ed, tool, key, v); render(); } }, t));
   }
   render();
   return label ? el('div', { class: 'pe-opt' }, el('span', {}, label), wrap) : wrap;
@@ -53,10 +54,10 @@ export function optSeg(ed, tool, key, options, label) {
 
 export function selModeSeg(ed, tool) {
   return optSeg(ed, tool, 'mode', [
-    ['replace', '▣', 'New selection'],
-    ['add', '+', 'Add to selection (Shift)'],
-    ['subtract', '−', 'Subtract from selection (Alt/Option)'],
-    ['intersect', '∩', 'Intersect with selection (Shift+Alt)'],
+    ['replace', iconEl('selNew', 16), 'New selection'],
+    ['add', iconEl('selAdd', 16), 'Add to selection (Shift)'],
+    ['subtract', iconEl('selSub', 16), 'Subtract from selection (Alt/Option)'],
+    ['intersect', iconEl('selIntersect', 16), 'Intersect with selection (Shift+Alt)'],
   ]);
 }
 

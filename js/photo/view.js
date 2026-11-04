@@ -2,6 +2,10 @@
 import { el } from '../ui.js';
 
 const ZOOM_STEPS = [0.02, 0.03, 0.05, 0.0667, 0.1, 0.125, 0.1667, 0.25, 0.333, 0.5, 0.667, 1, 1.5, 2, 3, 4, 6, 8, 12, 16, 24, 32];
+// Click-once tools: on touch they run when the finger lifts, so a second finger can still turn the tap into a pinch.
+const TAP_TOOLS = new Set(['bucket', 'wand', 'zoom', 'text']);
+// On touch a stroke starts after TOUCH_DELAY ms or once the finger travels TOUCH_SLOP px, whichever comes first.
+const TOUCH_DELAY = 90, TOUCH_SLOP = 6;
 
 export class View {
   constructor(ed, host) {
@@ -17,6 +21,8 @@ export class View {
     this.pending = false;
     this.spaceDown = false;
     this.drag = null;
+    this.gesture = null;
+    this.keepCenter = false; // compact layouts: keep the image centered when the viewport resizes (sheets, drawers)
     new ResizeObserver(() => this.resize()).observe(host);
     setInterval(() => {
       if (this.ed.doc?.selection.active && !this.ed.root.classList.contains('hidden')) { this.ants = (this.ants + 1) % 8; this.render(); }
@@ -29,6 +35,12 @@ export class View {
     const w = this.host.clientWidth, h = this.host.clientHeight;
     if (!w || !h) return;
     const first = !this.cw;
+    if (!first && this.keepCenter && this.ed.doc && (w !== this.cw || h !== this.ch)) {
+      this.panX += (w - this.cw) / 2;
+      this.panY += (h - this.ch) / 2;
+      this.cw = w; this.ch = h;
+      this.ed.emit('view');
+    }
     this.cw = w; this.ch = h; this.dpr = dpr;
     this.canvas.width = Math.round(w * dpr);
     this.canvas.height = Math.round(h * dpr);
@@ -142,9 +154,63 @@ export class View {
 
   bindPointer() {
     const cv = this.canvas;
+    const touches = new Map(); // active touch points on the canvas: id -> { x, y }
+    const local = (x, y) => { const r = cv.getBoundingClientRect(); return { x: x - r.left, y: y - r.top }; };
+
+    // Start the deferred touch stroke: replay the original down and any queued moves.
+    const flush = () => {
+      const d = this.drag;
+      if (!d?.pending) return;
+      clearTimeout(d.timer);
+      d.pending = false;
+      this.ed.pointer('down', d.down, this.toDoc(d.down.clientX, d.down.clientY));
+      for (const m of d.queue) this.ed.pointer('move', m, this.toDoc(m.clientX, m.clientY));
+      d.queue = null;
+    };
+
+    // Two fingers: drop any one-finger action without side effects, then pinch / pan.
+    const startGesture = () => {
+      const d = this.drag;
+      if (d) {
+        clearTimeout(d.timer);
+        if (!d.pan && !d.pending) this.ed.abortPointer();
+        this.drag = null;
+        this.host.classList.remove('panning');
+      }
+      const [a, b] = [...touches.values()];
+      const m = local((a.x + b.x) / 2, (a.y + b.y) / 2);
+      this.gesture = {
+        dist: Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)), zoom: this.zoom,
+        anchor: { x: (m.x - this.panX) / this.zoom, y: (m.y - this.panY) / this.zoom },
+      };
+      this.pointer = null;
+      this.render();
+    };
+
+    const moveGesture = () => {
+      const g = this.gesture;
+      const [a, b] = [...touches.values()];
+      if (!g || !b) return;
+      const m = local((a.x + b.x) / 2, (a.y + b.y) / 2);
+      const z = Math.max(0.01, Math.min(32, g.zoom * (Math.hypot(b.x - a.x, b.y - a.y) / g.dist)));
+      this.zoom = z;
+      this.panX = m.x - g.anchor.x * z;
+      this.panY = m.y - g.anchor.y * z;
+      this.changed();
+    };
+
     cv.addEventListener('contextmenu', (e) => e.preventDefault());
     cv.addEventListener('pointerdown', (e) => {
-      if (!this.ed.doc || this.drag) return;
+      if (!this.ed.doc) return;
+      const touch = e.pointerType === 'touch';
+      if (touch) {
+        e.preventDefault(); // no emulated mouse events, so an open text box keeps focus
+        touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        cv.setPointerCapture(e.pointerId);
+        if (touches.size >= 2) { startGesture(); return; }
+        if (this.gesture) return;
+      }
+      if (this.drag) return;
       cv.setPointerCapture(e.pointerId);
       const panning = e.button === 1 || this.spaceDown || this.ed.tool === 'hand';
       if (panning) {
@@ -153,10 +219,20 @@ export class View {
         return;
       }
       if (e.button !== 0) return;
-      this.drag = { pan: false, id: e.pointerId };
+      if (touch && !this.ed.session) {
+        const tap = TAP_TOOLS.has(this.ed.tool);
+        this.drag = { pan: false, id: e.pointerId, pending: true, tap, down: e, queue: [], touch: true };
+        if (!tap) this.drag.timer = setTimeout(flush, TOUCH_DELAY);
+        return;
+      }
+      this.drag = { pan: false, id: e.pointerId, touch };
       this.ed.pointer('down', e, this.toDoc(e.clientX, e.clientY));
     });
     cv.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
+        touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (this.gesture) { moveGesture(); return; }
+      }
       const p = this.toDoc(e.clientX, e.clientY);
       this.pointer = p;
       this.ed.emit('cursor', p);
@@ -166,19 +242,47 @@ export class View {
         this.changed();
         return;
       }
-      if (this.drag) {
+      const d = this.drag;
+      if (d?.pending) {
+        if (d.tap) return;
+        const events = e.getCoalescedEvents?.() || [];
+        d.queue.push(...(events.length ? events : [e]));
+        if (Math.hypot(e.clientX - d.down.clientX, e.clientY - d.down.clientY) >= TOUCH_SLOP) flush();
+        return;
+      }
+      if (d) {
         const events = e.getCoalescedEvents?.() || [e];
         for (const ce of events.length ? events : [e]) this.ed.pointer('move', ce, this.toDoc(ce.clientX, ce.clientY));
-      } else {
+      } else if (e.pointerType !== 'touch') {
         this.ed.pointer('hover', e, p);
       }
     });
     const end = (e) => {
+      if (e.pointerType === 'touch' && touches.delete(e.pointerId) && this.gesture) {
+        if (touches.size >= 2) startGesture();
+        else if (!touches.size) this.gesture = null;
+        return;
+      }
       if (!this.drag || this.drag.id !== e.pointerId) return;
       const d = this.drag;
       this.drag = null;
       this.host.classList.remove('panning');
-      if (!d.pan) this.ed.pointer('up', e, this.toDoc(e.clientX, e.clientY));
+      if (d.pan) return;
+      if (d.touch && e.type === 'pointercancel') {
+        // The browser took the touch over: undo the partial stroke rather than committing it.
+        clearTimeout(d.timer);
+        if (!d.pending) this.ed.abortPointer();
+      } else if (d.pending && d.tap) {
+        const p = this.toDoc(d.down.clientX, d.down.clientY);
+        this.ed.pointer('down', d.down, p);
+        this.ed.pointer('up', d.down, p);
+      } else {
+        this.drag = d;
+        flush();
+        this.drag = null;
+        this.ed.pointer('up', e, this.toDoc(e.clientX, e.clientY));
+      }
+      if (d.touch) { this.pointer = null; this.render(); }
     };
     cv.addEventListener('pointerup', end);
     cv.addEventListener('pointercancel', end);

@@ -1,5 +1,6 @@
 // Fill & draw tools (bucket, gradient, shapes, text), eyedropper, hand and zoom.
 import { el, toast } from '../ui.js';
+import { iconEl } from '../icons.js';
 import { License } from '../license.js';
 import { CONFIG } from '../config.js';
 import { floodMask, hexToRgb, rgbToHex } from './pixels.js';
@@ -65,6 +66,7 @@ export const gradient = {
     this.s = new StrokeSession(ed, { opacity: ed.opts.gradient.opacity / 100 });
     this.a = p; this.b = p;
   },
+  abort() { if (this.s) { this.s.cancel(); this.s = null; } },
   move(ed, e, p) {
     if (!this.s) return;
     this.b = e.shiftKey ? snapAngle(this.a, p) : p;
@@ -119,7 +121,7 @@ export const shape = {
   id: 'shape', name: 'Shapes', key: 'U', icon: 'shapes', cursor: 'crosshair',
   defaults: { shape: 'rect', fill: true, stroke: false, strokeColor: '#000000', strokeWidth: 4, radius: 0, opacity: 100, newLayer: false },
   options: (ed) => [
-    optSeg(ed, 'shape', 'shape', [['rect', '▭ Rect'], ['ellipse', '◯ Ellipse'], ['line', '╱ Line']]),
+    optSeg(ed, 'shape', 'shape', [['rect', [iconEl('rect', 15), 'Rect']], ['ellipse', [iconEl('circle', 15), 'Ellipse']], ['line', [iconEl('line', 15), 'Line']]]),
     optCheck(ed, 'shape', 'fill', 'Fill (foreground)'),
     optCheck(ed, 'shape', 'stroke', 'Stroke'),
     optColor(ed, 'shape', 'strokeColor', ''),
@@ -134,7 +136,14 @@ export const shape = {
     if (o.newLayer && !ed.doc.addLayer(o.shape === 'line' ? 'Line' : o.shape === 'rect' ? 'Rectangle' : 'Ellipse')) return;
     if (!ed.editableLayer()) return;
     this.s = new StrokeSession(ed, { opacity: o.opacity / 100 });
+    this.added = o.newLayer;
     this.a = p; this.b = p; this.e = e;
+  },
+  abort(ed) {
+    if (!this.s) return;
+    this.s.cancel();
+    this.s = null;
+    if (this.added) ed.doc.deleteLayer();
   },
   move(ed, e, p) {
     if (!this.s) return;
@@ -184,6 +193,8 @@ export const shape = {
 
 // ---------- Text ----------
 
+const COARSE = matchMedia('(pointer: coarse)');
+
 export const FONTS = ['system-ui', 'Arial', 'Helvetica', 'Georgia', 'Times New Roman', 'Courier New', 'Verdana', 'Trebuchet MS', 'Impact', 'Palatino', 'Futura', 'Avenir', 'Comic Sans MS', 'serif', 'sans-serif', 'monospace', 'cursive'];
 
 export const text = {
@@ -194,10 +205,10 @@ export const text = {
     optRange(ed, 'text', 'size', 'Size', { min: 4, max: 1000, unit: 'px' }),
     optCheck(ed, 'text', 'bold', 'Bold'),
     optCheck(ed, 'text', 'italic', 'Italic'),
-    optSeg(ed, 'text', 'align', [['left', '⇤'], ['center', '↔'], ['right', '⇥']]),
-    optButton('✓ Commit', () => text.commit(ed), { class: 'btn primary', title: 'Ctrl/Cmd+Enter' }),
+    optSeg(ed, 'text', 'align', [['left', iconEl('alignLeft', 15), 'Align left'], ['center', iconEl('alignCenter', 15), 'Align center'], ['right', iconEl('alignRight', 15), 'Align right']]),
+    optButton([iconEl('check', 16), 'Commit'], () => text.commit(ed), { class: 'btn primary', title: 'Ctrl/Cmd+Enter' }),
     optButton('Cancel', () => text.cancel(ed), { title: 'Esc' }),
-    hint('Click to type · color = foreground'),
+    hint('Click or tap to type · color = foreground'),
   ],
   init(ed) {
     const restyle = () => this.edit && this.style(ed);
@@ -209,7 +220,7 @@ export const text = {
   down(ed, e, p) {
     if (this.edit) { this.commit(ed); return; }
     this.edit = { x: p.x, y: p.y };
-    const ta = el('textarea', { class: 'pe-text-edit', spellcheck: false, wrap: 'off' });
+    const ta = el('textarea', { class: 'pe-text-edit', spellcheck: false, wrap: 'off', autocapitalize: 'sentences', 'aria-label': 'Text' });
     ta.addEventListener('keydown', (ev) => {
       ev.stopPropagation();
       if (ev.key === 'Escape') { ev.preventDefault(); this.cancel(ed); }
@@ -219,18 +230,25 @@ export const text = {
     this.edit.ta = ta;
     ed.view.host.append(ta);
     this.style(ed);
-    setTimeout(() => ta.focus(), 0);
+    // Focus synchronously so touch browsers open the on-screen keyboard (this runs inside the tap),
+    // and again after the mouse default action, which moves focus off the canvas on desktop.
+    ta.focus({ preventScroll: true });
+    setTimeout(() => ta.focus({ preventScroll: true }), 0);
   },
   style(ed) {
     const { ta, x, y } = this.edit, o = ed.opts.text, z = ed.view.zoom;
     const s = ed.view.toScreen(x, y);
-    Object.assign(ta.style, { font: this.font(o, o.size * z), lineHeight: String(o.lineHeight), color: ed.fg, textAlign: o.align });
+    // iOS zooms the page when a focused field's font is under 16px: lay the box out at 16px and scale it down.
+    const px = o.size * z, fontPx = COARSE.matches ? Math.max(16, px) : px, k = px / fontPx;
+    Object.assign(ta.style, { font: this.font(o, fontPx), lineHeight: String(o.lineHeight), color: ed.fg, textAlign: o.align,
+      transform: k === 1 ? '' : `scale(${k})`, transformOrigin: '0 0' });
     ta.style.height = '0px';
     ta.style.width = '0px';
-    const w = Math.max(40, ta.scrollWidth + 4), h = Math.max(o.size * z * o.lineHeight, ta.scrollHeight);
+    const w = Math.max(40 / k, ta.scrollWidth + 4), h = Math.max(fontPx * o.lineHeight, ta.scrollHeight);
     ta.style.width = `${w}px`;
     ta.style.height = `${h}px`;
-    const left = o.align === 'center' ? s.x - w / 2 : o.align === 'right' ? s.x - w : s.x;
+    const vw = w * k;
+    const left = o.align === 'center' ? s.x - vw / 2 : o.align === 'right' ? s.x - vw : s.x;
     ta.style.left = `${left}px`;
     ta.style.top = `${s.y}px`;
   },
@@ -288,12 +306,18 @@ export const eyedropper = {
     optSeg(ed, 'eyedropper', 'merged', [[true, 'All layers'], [false, 'Current layer']]),
     hint('Click: foreground · Alt-click: background'),
   ],
+  abort(ed) {
+    if (!this.on) return;
+    this.on = false;
+    ed.fg = this.prev.fg; ed.bg = this.prev.bg;
+    ed.emit('colors');
+  },
   pick(ed, e, p) {
     const o = ed.opts.eyedropper;
     const c = samplePixel(ed, p.x, p.y, +o.size, o.merged === true || o.merged === 'true');
     if (c) ed.setColor(e.altKey ? 'bg' : 'fg', c);
   },
-  down(ed, e, p) { this.on = true; this.pick(ed, e, p); },
+  down(ed, e, p) { this.on = true; this.prev = { fg: ed.fg, bg: ed.bg }; this.pick(ed, e, p); },
   move(ed, e, p) { if (this.on) this.pick(ed, e, p); },
   up() { this.on = false; },
 };
@@ -302,7 +326,7 @@ export const eyedropper = {
 
 export const hand = {
   id: 'hand', name: 'Hand', key: 'H', icon: 'hand', cursor: 'grab', defaults: {},
-  options: (ed) => [optButton('Fit on screen', () => ed.view.fit(), { title: 'Ctrl/Cmd+0' }), optButton('100%', () => ed.view.actual(), { title: 'Ctrl/Cmd+1' }), hint('Drag to pan · hold Space with any tool')],
+  options: (ed) => [optButton('Fit on screen', () => ed.view.fit(), { title: 'Ctrl/Cmd+0' }), optButton('100%', () => ed.view.actual(), { title: 'Ctrl/Cmd+1' }), hint('Drag to pan · hold Space or use two fingers with any tool')],
 };
 
 export const zoom = {
@@ -312,7 +336,7 @@ export const zoom = {
     optButton('Zoom out', () => ed.view.zoomStep(-1), { title: '-' }),
     optButton('Fit', () => ed.view.fit()),
     optButton('100%', () => ed.view.actual()),
-    hint('Click to zoom in · Alt/Option-click to zoom out'),
+    hint('Click to zoom in · Alt/Option-click to zoom out · pinch on touch'),
   ],
   down(ed, e) {
     const r = ed.view.canvas.getBoundingClientRect();

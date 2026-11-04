@@ -71,10 +71,12 @@ export function curveEditor(value, onChange, hist) {
 
   const changed = () => { draw(); onChange(value); };
 
+  // Hit radius in curve units (0..255); fingers need a bigger target than a mouse.
+  const reach = (e) => (e.pointerType === 'touch' ? 22 : 10);
   canvas.addEventListener('pointerdown', (e) => {
     canvas.setPointerCapture(e.pointerId);
     const p = toLocal(e), list = pts();
-    drag = list.findIndex(([x, y]) => Math.hypot(x - p.x, y - p.y) < 10);
+    drag = list.findIndex(([x, y]) => Math.hypot(x - p.x, y - p.y) < reach(e));
     if (drag < 0) {
       list.push([Math.round(p.x), Math.round(p.y)]);
       list.sort((a, b) => a[0] - b[0]);
@@ -107,5 +109,5 @@ export function curveEditor(value, onChange, hist) {
   return el('div', { class: 'pe-curves' },
     el('div', { class: 'row' }, el('span', { class: 'muted' }, 'Channel'), chSel, el('div', { class: 'spacer' }), readout),
     canvas,
-    el('div', { class: 'muted pe-small' }, 'Click to add a point, drag to shape, double-click or drag off to remove.'));
+    el('div', { class: 'muted pe-small' }, 'Click or tap to add a point, drag to shape, double-click or drag it off the graph to remove.'));
 }

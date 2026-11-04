@@ -169,6 +169,7 @@ function paintTool({ id, name, key, icon, mode = 'source-over', aliased = false,
       ...(extraOptions?.(ed) || []),
       hint('Shift-click: straight line · [ ] size'),
     ],
+    abort() { if (this.s) { this.s.cancel(); this.s = null; } },
     down(ed, e, p) {
       if (!ed.editableLayer()) return;
       const o = ed.opts[id];
@@ -223,16 +224,18 @@ export const clone = {
     optCheck(ed, 'clone', 'sampleAll', 'Sample all layers'),
     hint('Alt/Option-click sets the source'),
   ],
+  abort() { if (this.s) { this.s.cancel(); this.s = null; } },
   down(ed, e, p) {
     if (e.altKey) {
       ed.cloneSource = { x: p.x, y: p.y };
       this.offset = null;
+      if (ed.mods.alt) ed.setMod('alt', false); // the on-screen Alt toggle is one-shot for picking the source
       toast('Clone source set');
       ed.render();
       return;
     }
     if (!requirePro('Clone stamp') || !ed.editableLayer()) return;
-    if (!ed.cloneSource) { toast('Alt/Option-click to set a clone source first', 'warn'); return; }
+    if (!ed.cloneSource) { toast(e.pointerType === 'touch' ? 'Turn on Alt and tap to set a clone source first' : 'Alt/Option-click to set a clone source first', 'warn'); return; }
     const o = ed.opts.clone;
     if (!o.aligned || !this.offset) this.offset = { x: ed.cloneSource.x - p.x, y: ed.cloneSource.y - p.y };
     this.s = new StrokeSession(ed, { opacity: o.opacity / 100 });
@@ -284,6 +287,9 @@ function retouchTool({ id, name, key, icon, defaults, options, label, process, b
       const hard = o.hardness / 100;
       this.state = begin ? begin(o, size) : {};
       this.active = true;
+      this.layer = layer;
+      this.backup = ed.scratch('backup');
+      this.backup.ctx.drawImage(layer.canvas, 0, 0);
       this.step = new Stepper(Math.max(1, size * 0.2), (x, y) => {
         const rect = clampRect(x - r, y - r, size, size, d.width, d.height);
         if (!rect) return;
@@ -306,6 +312,14 @@ function retouchTool({ id, name, key, icon, defaults, options, label, process, b
       d.changed('pixels');
     },
     move(ed, e, p) { if (this.active) { this.step.to(p); ed.doc.changed('pixels'); } },
+    abort(ed) {
+      if (!this.active) return;
+      this.active = false;
+      const d = ed.doc, L = this.layer.ctx;
+      L.clearRect(0, 0, d.width, d.height);
+      L.drawImage(this.backup.canvas, 0, 0);
+      d.changed('pixels');
+    },
     up(ed) {
       if (!this.active) return;
       this.active = false;

@@ -40,7 +40,7 @@ export function newDocForm(ed, onDone) {
 
 export function newDocDialog(ed) {
   if (!confirmDiscard(ed)) return;
-  const dlg = modal('New canvas', el('div', { class: 'modal-body' }, newDocForm(ed, () => dlg.close())));
+  const dlg = modal('New canvas', el('div', { class: 'modal-body pe-dlg' }, newDocForm(ed, () => dlg.close())));
 }
 
 export function confirmDiscard(ed) {
@@ -189,7 +189,7 @@ export function exportDialog(ed) {
       ed.busy(false);
     }
   };
-  const dlg = modal('Export image', el('div', { class: 'modal-body' },
+  const dlg = modal('Export image', el('div', { class: 'modal-body pe-dlg' },
     el('label', { class: 'field' }, el('span', {}, 'Format'), fmt), quality, scale, info,
     el('div', { class: 'row' }, el('div', { class: 'spacer' }), el('button', { class: 'btn', onclick: () => dlg.close() }, 'Cancel'), el('button', { class: 'btn primary', onclick: go }, 'Export'))));
   update();
@@ -219,7 +219,7 @@ export function imageSizeDialog(ed) {
     d.history.push('Image size');
     ed.view.fit();
   };
-  const dlg = modal('Image size', el('div', { class: 'modal-body' },
+  const dlg = modal('Image size', el('div', { class: 'modal-body pe-dlg' },
     el('label', { class: 'field' }, el('span', {}, 'Width'), w, el('span', { class: 'muted' }, 'px')),
     el('label', { class: 'field' }, el('span', {}, 'Height'), h, el('span', { class: 'muted' }, 'px')),
     el('label', { class: 'field' }, el('span', {}, 'Percent'), pct, el('span', { class: 'muted' }, '%')),
@@ -249,7 +249,7 @@ export function canvasSizeDialog(ed) {
     d.history.push('Canvas size');
     ed.view.fit();
   };
-  const dlg = modal('Canvas size', el('div', { class: 'modal-body' },
+  const dlg = modal('Canvas size', el('div', { class: 'modal-body pe-dlg' },
     el('label', { class: 'field' }, el('span', {}, 'Width'), w, el('span', { class: 'muted' }, 'px')),
     el('label', { class: 'field' }, el('span', {}, 'Height'), h, el('span', { class: 'muted' }, 'px')),
     el('div', { class: 'field' }, el('span', {}, 'Anchor'), grid),

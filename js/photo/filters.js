@@ -16,7 +16,7 @@ export const ADJUSTMENTS = [
   { op: 'vibrance', name: 'Vibrance', params: [R('vibrance', 'Vibrance', -100, 100, 0), R('saturation', 'Saturation', -100, 100, 0)] },
   { op: 'colorBalance', name: 'Color balance', params: [
     { key: 'tone', label: 'Tones', type: 'select', value: 'midtones', options: [['shadows', 'Shadows'], ['midtones', 'Midtones'], ['highlights', 'Highlights']] },
-    R('cyanRed', 'Cyan ↔ Red', -100, 100, 0), R('magentaGreen', 'Magenta ↔ Green', -100, 100, 0), R('yellowBlue', 'Yellow ↔ Blue', -100, 100, 0),
+    R('cyanRed', 'Cyan – Red', -100, 100, 0), R('magentaGreen', 'Magenta – Green', -100, 100, 0), R('yellowBlue', 'Yellow – Blue', -100, 100, 0),
     { key: 'preserve', label: 'Preserve luminosity', type: 'check', value: true }] },
   { op: 'levels', name: 'Levels', histogram: true, params: [R('inBlack', 'Input black', 0, 254, 0), R('gamma', 'Midtones', 0.1, 5, 1, 0.01), R('inWhite', 'Input white', 1, 255, 255), R('outBlack', 'Output black', 0, 255, 0), R('outWhite', 'Output white', 0, 255, 255)] },
   { op: 'curves', name: 'Curves', pro: true, params: [{ key: 'curve', type: 'curve', value: defaultCurve }] },
@@ -273,7 +273,7 @@ export function createAdjustPanel(ed) {
     if (p.type === 'color') {
       const c = el('input', { type: 'color', value: s.params[p.key], oninput: () => set(c.value) });
       s.colorInput = c;
-      return el('label', { class: 'field' }, el('span', {}, p.label), el('div', { class: 'row' }, c, el('small', { class: 'muted' }, 'or click the image')));
+      return el('label', { class: 'field' }, el('span', {}, p.label), el('div', { class: 'row' }, c, el('small', { class: 'muted' }, 'or tap / click the image')));
     }
     if (p.type === 'curve') {
       const b = s.bounds;

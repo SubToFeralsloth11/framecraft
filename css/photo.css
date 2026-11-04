@@ -83,7 +83,11 @@
 #photo-root .pe-side { grid-row: 3; grid-column: 3; display: flex; flex-direction: column; gap: 8px; padding: 8px; background: var(--bg2); border-left: 1px solid var(--line); overflow-y: auto; min-height: 0; }
 #photo-root .pe-panel { flex: none; }
 #photo-root .pe-panel-title { display: block; width: 100%; border: 0; background: none; text-align: left; cursor: pointer; padding-bottom: 6px; }
-#photo-root .pe-panel-title::before { content: '▾'; display: inline-block; width: 12px; transition: transform .15s; }
+#photo-root .pe-panel-title::before {
+  content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 2px; vertical-align: -1px; background: currentColor; transition: transform .15s;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
 #photo-root .pe-panel.collapsed .pe-panel-title::before { transform: rotate(-90deg); }
 #photo-root .pe-panel.collapsed .pe-panel-body { display: none; }
 #photo-root .pe-panel-body { padding-bottom: 6px; }
@@ -138,9 +142,168 @@
 #photo-root .pe-history-n { width: 18px; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* While an adjustment is open, everything except the adjustments panel and canvas is paused. */
-#photo-root.pe-session :is(.pe-menu, .pe-options, .pe-tools, .pe-p-layers, .pe-p-history) { pointer-events: none; opacity: .45; }
+#photo-root.pe-session :is(.pe-menu, .pe-options, .pe-tools, .pe-p-layers, .pe-p-history, .pe-dock-btn:not([data-tab=adjust])) { pointer-events: none; opacity: .45; }
 
+/* Compact-layout controls: hidden on desktop. */
+#photo-root :is(.pe-m-more, .pe-m-panels, .pe-fit, .pe-side-head, .pe-dock) { display: none; }
+#photo-root .pe-status .icon-btn:not(.pe-fit) { display: grid; place-items: center; }
+#photo-root .pe-fit { place-items: center; }
+
+/* Overflow menu */
+#photo-root .pe-more { position: absolute; top: 40px; right: 8px; z-index: 40; display: grid; width: min(290px, calc(100% - 16px)); max-height: calc(100% - 52px); overflow-y: auto; overscroll-behavior: contain; padding: 4px 6px 8px; background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 16px 40px #000a; }
+#photo-root .pe-more-sec { font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); font-weight: 700; padding: 10px 8px 4px; }
+#photo-root .pe-more-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 8px 10px; border: 0; border-radius: 6px; background: none; color: var(--fg); text-align: left; cursor: pointer; }
+#photo-root .pe-more-item:hover:not(:disabled) { background: var(--panel2); }
+#photo-root .pe-more-item:disabled { opacity: .35; cursor: default; }
+#photo-root .pe-more-item svg { color: var(--muted); flex: none; }
+
+/* On-screen modifier toggles (touch) */
+#photo-root .pe-mods { display: inline-flex; gap: 4px; flex: none; }
+#photo-root .pe-mod { display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg2); color: var(--muted); cursor: pointer; white-space: nowrap; }
+#photo-root .pe-mod b { color: var(--fg); font-size: 12px; }
+#photo-root .pe-mod small { font-size: 11px; }
+#photo-root .pe-mod.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+#photo-root .pe-mod.active b { color: #fff; }
+#photo-root .pe-seg button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+
+/* Layer actions sheet (long-press) */
+.modal .pe-actions { grid-template-columns: 1fr 1fr; gap: 8px; }
+.modal .pe-action { justify-content: flex-start; min-height: 44px; }
+.modal .pe-rename-input { width: 100%; }
+
+/* Touch screens: bigger hit targets, 16px fields (no iOS zoom on focus), no hover-only info. */
+@media (pointer: coarse) {
+  #photo-root :is(input[type=text], input[type=number], select, textarea:not(.pe-text-edit)), .pe-dlg :is(input[type=text], input[type=number], select, textarea) { font-size: 16px; }
+  #photo-root .pe-num { width: 70px; }
+  #photo-root input[type=checkbox], .pe-dlg input[type=checkbox] { width: 20px; height: 20px; }
+  #photo-root .pe-seg button { min-height: 36px; min-width: 40px; }
+  #photo-root .pe-options .btn { min-height: 36px; }
+  #photo-root .pe-fit { display: grid; }
+  #photo-root .pe-status .icon-btn, #photo-root .pe-zoom { min-width: 36px; min-height: 36px; }
+  #photo-root :is(.pe-pos, .pe-tip) { display: none; }
+  #photo-root .pe-layer { min-height: 48px; -webkit-touch-callout: none; -webkit-user-select: none; }
+  #photo-root :is(.pe-layer, .pe-layer-bar) .icon-btn { min-width: 40px; min-height: 40px; }
+  #photo-root .pe-history-item { padding: 10px 8px; }
+  #photo-root :is(.pe-fx-btn, .pe-preset) { min-height: 40px; }
+  #photo-root .pe-panel-title { min-height: 36px; }
+  #photo-root .pe-adjust .field { min-height: 40px; }
+  .pe-dlg .btn { min-height: 40px; }
+  .modal .pe-anchor { grid-template-columns: repeat(3, 40px); }
+  .modal .pe-anchor button { width: 40px; height: 40px; }
+}
+
+/* Tablet (and phone landscape): tool column stays, panels become an overlay drawer. */
 @media (max-width: 1100px) {
-  #photo-root.pe { grid-template-columns: 82px minmax(0, 1fr) 250px; }
+  #photo-root.pe { grid-template-columns: 82px minmax(0, 1fr); }
   #photo-root .pe-mbtn span:not(.pro-badge) { display: none; }
+  #photo-root .pe-menu { padding: 0 max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); }
+  #photo-root :is(.pe-m-more, .pe-m-panels) { display: inline-flex; }
+  #photo-root .pe-m-panels { margin-left: auto; }
+  #photo-root .pe-fit { display: grid; }
+  #photo-root .pe-tools { padding-left: env(safe-area-inset-left); }
+  #photo-root .pe-side {
+    position: absolute; grid-area: auto; top: 84px; right: 0; bottom: 0; z-index: 25; width: min(320px, 88%);
+    padding: 0 max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) 8px;
+    box-shadow: -14px 0 32px #0008; transform: translateX(105%); visibility: hidden; transition: transform .2s ease, visibility 0s .2s;
+  }
+  #photo-root.pe-panels-open .pe-side { transform: none; visibility: visible; transition: transform .2s ease; }
+  #photo-root .pe-side-head { display: flex; align-items: center; gap: 8px; position: sticky; top: 0; z-index: 2; min-height: 44px; margin: 0 -8px; padding: 0 4px 0 12px; background: var(--bg2); border-bottom: 1px solid var(--line); }
+  #photo-root .pe-side-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #photo-root .pe-side-tab, #photo-root .pe-sheet-handle { display: none; }
+  #photo-root .pe-side-close { display: grid; place-items: center; min-width: 40px; min-height: 40px; }
+}
+@media (max-width: 1100px) and (pointer: coarse) {
+  #photo-root.pe { grid-template-columns: 96px minmax(0, 1fr); }
+  #photo-root .pe-tool-grid { grid-template-columns: repeat(2, 42px); }
+  #photo-root .pe-tool-grid .tool-btn { width: 42px; height: 42px; }
+  #photo-root .pe-mbtn { min-width: 40px; min-height: 36px; justify-content: center; }
+}
+
+/* Phone: top action row, canvas, options row, scrollable tool strip, bottom dock; panels in a bottom sheet. */
+@media (max-width: 759px) {
+  #photo-root.pe {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 44px minmax(0, 1fr) auto auto auto;
+    grid-template-areas: 'menu' 'view' 'opts' 'tools' 'dock';
+  }
+  #photo-root.pe.pe-panels-open {
+    grid-template-rows: 44px minmax(0, 1fr) var(--pe-sheet-h, 55%) auto;
+    grid-template-areas: 'menu' 'view' 'side' 'dock';
+  }
+  #photo-root.pe-panels-open :is(.pe-options, .pe-tools) { display: none; }
+
+  /* Top action row: undo, redo, open, export, more */
+  #photo-root .pe-menu { grid-area: menu; gap: 2px; padding: 0 max(4px, env(safe-area-inset-right)) 0 max(4px, env(safe-area-inset-left)); overflow: hidden; }
+  #photo-root .pe-menu > * { display: none; }
+  #photo-root .pe-menu > .pe-m-keep { display: inline-flex; justify-content: center; min-width: 44px; min-height: 40px; padding: 0 8px; }
+  #photo-root .pe-menu .pe-m-undo { order: 1; }
+  #photo-root .pe-menu .pe-m-redo { order: 2; }
+  #photo-root .pe-menu .pe-m-open { order: 3; margin-left: auto; }
+  #photo-root .pe-menu .pe-m-export { order: 4; }
+  #photo-root .pe-menu .pe-m-more { order: 5; }
+  #photo-root .pe-menu .pe-mbtn svg { color: var(--fg); }
+  #photo-root .pe-more { top: 44px; right: max(4px, env(safe-area-inset-right)); }
+
+  #photo-root .pe-viewport { grid-area: view; }
+  #photo-root .pe-status { left: 8px; bottom: 8px; padding: 2px 6px; }
+  #photo-root .pe-busy { right: 8px; bottom: 8px; }
+
+  /* Tool options: one horizontally scrollable row */
+  #photo-root .pe-options { grid-area: opts; height: 48px; gap: 10px; padding: 0 max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); border-top: 1px solid var(--line); border-bottom: 0; scrollbar-width: none; overscroll-behavior-x: contain; }
+  #photo-root .pe-options::-webkit-scrollbar { display: none; }
+  #photo-root .pe-opt-tool { padding-right: 10px; flex: none; }
+  #photo-root .pe-opt-tool b { display: none; }
+  #photo-root .pe-options > * { flex: none; }
+  #photo-root .pe-hint { display: none; }
+  #photo-root .pe-opt input[type=range] { width: 96px; }
+
+  /* Tool strip + colors */
+  #photo-root .pe-tools { grid-area: tools; flex-direction: row; align-items: center; gap: 4px; padding: 2px max(6px, env(safe-area-inset-right)) 2px max(4px, env(safe-area-inset-left)); border-right: 0; border-top: 1px solid var(--line); overflow: hidden; }
+  #photo-root .pe-tool-grid { display: flex; flex: 1; min-width: 0; gap: 2px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+  #photo-root .pe-tool-grid::-webkit-scrollbar { display: none; }
+  #photo-root .pe-tool-grid .tool-btn { flex: none; width: 44px; height: 44px; }
+  #photo-root .pe-swatches { width: 88px; height: 48px; border-left: 1px solid var(--line); }
+  #photo-root .pe-swatch { width: 28px; height: 28px; }
+  #photo-root .pe-swatch.fg { left: 6px; top: 3px; }
+  #photo-root .pe-swatch.bg { left: 20px; top: 17px; }
+  #photo-root .pe-swap { right: 0; top: 4px; width: 40px; height: 40px; display: grid; place-items: center; transform: none; }
+  #photo-root .pe-reset { display: none; }
+
+  /* Bottom dock */
+  #photo-root .pe-dock { grid-area: dock; display: flex; background: var(--bg2); border-top: 1px solid var(--line); padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #photo-root .pe-dock-btn { flex: 1; display: grid; justify-items: center; align-content: center; gap: 2px; min-height: 52px; border: 0; background: none; color: var(--muted); font-size: 11px; cursor: pointer; }
+  #photo-root .pe-dock-btn.active { color: var(--fg); box-shadow: inset 0 2px 0 var(--accent); }
+
+  /* Panel sheet */
+  #photo-root .pe-side {
+    grid-area: side; position: static; display: none; width: auto; transform: none; visibility: visible; transition: none; box-shadow: 0 -10px 30px #0007;
+    border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0; padding: 0 max(8px, env(safe-area-inset-right)) 12px max(8px, env(safe-area-inset-left));
+    overscroll-behavior: contain;
+  }
+  #photo-root.pe-panels-open .pe-side { display: flex; }
+  #photo-root .pe-side-head { position: sticky; margin: 0 -8px; padding: 10px 4px 0 14px; min-height: 50px; border-radius: 14px 14px 0 0; touch-action: none; cursor: grab; }
+  #photo-root .pe-sheet-handle { display: block; position: absolute; left: 50%; top: 6px; width: 40px; height: 5px; margin-left: -20px; border-radius: 3px; background: var(--line); }
+  #photo-root .pe-side-tab { display: inline; }
+  #photo-root .pe-side-all { display: none; }
+  #photo-root .pe-side .pe-panel { display: none; }
+  #photo-root[data-sheet=layers] .pe-p-layers, #photo-root[data-sheet=adjust] .pe-p-adjust, #photo-root[data-sheet=history] .pe-p-history { display: block; }
+  #photo-root .pe-side .pe-panel-title { display: none; }
+  #photo-root .pe-side .pe-panel.collapsed .pe-panel-body { display: block; }
+  #photo-root .pe-side .pe-panel-body { padding-top: 6px; }
+  #photo-root :is(.pe-layer-list, .pe-history-list) { max-height: none; }
+  #photo-root .pe-adjust .field { grid-template-columns: 104px minmax(0, 1fr) 44px; }
+  #photo-root .pe-curves { max-width: 340px; margin: 0 auto; }
+
+  /* Welcome / new canvas */
+  #photo-root .pe-welcome { place-items: start center; padding: 12px max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left)); }
+  #photo-root .pe-welcome-card { padding: 16px; border-radius: 12px; }
+  #photo-root .pe-welcome h1 { font-size: 20px; }
+  #photo-root .pe-welcome-actions { flex-wrap: wrap; }
+  :is(#photo-root, .modal) .pe-new-grid { grid-template-columns: repeat(2, 1fr); }
+  :is(#photo-root, .modal) .pe-custom { gap: 8px; }
+  :is(#photo-root, .modal) .pe-custom input[type=number] { width: 76px; }
+  :is(#photo-root, .modal) .pe-custom .btn.primary { flex: 1; justify-content: center; }
+  .pe-dlg .field { grid-template-columns: 76px minmax(0, 1fr) auto; padding: 3px 0; }
+  .pe-dlg .row { flex-wrap: wrap; }
+  .modal .pe-actions { grid-template-columns: 1fr; }
 }
