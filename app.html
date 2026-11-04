@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FrameCraft Studio — Photo & Video Editor</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/photo.css">
+  <link rel="stylesheet" href="css/video.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <a class="brand" href="index.html"><span class="logo"></span>FrameCraft</a>
+      <nav class="tabs" id="mode-tabs">
+        <button data-mode="photo" class="active">Photo</button>
+        <button data-mode="video">Video</button>
+      </nav>
+      <div class="spacer"></div>
+      <span id="plan-status" class="muted"></span>
+      <button class="btn primary" id="upgrade-btn">Upgrade to Pro</button>
+    </header>
+    <div class="workspace">
+      <section class="mode" id="photo-root"></section>
+      <section class="mode hidden" id="video-root"></section>
+    </div>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
