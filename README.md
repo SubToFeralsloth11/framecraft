@@ -13,9 +13,15 @@ python3 -m http.server 8080   # then open http://localhost:8080
 
 ES modules need a web server, so opening the file directly with `file://` won't work.
 
-## Host for free
+## Hosting
 
-GitHub repo → Settings → Pages → Deploy from branch `main`, folder `/`. The site appears at `https://<user>.github.io/framecraft/`.
+GitHub Pages serves the `main` branch at **https://framecraft.syntaxrewrite.com** (set by the `CNAME` file). DNS for `syntaxrewrite.com` is at Namecheap and needs one record:
+
+| Type | Host | Value |
+|---|---|---|
+| CNAME | `framecraft` | `subtoferalsloth11.github.io.` |
+
+Once the record resolves, GitHub issues the HTTPS certificate. Then turn on Settings → Pages → Enforce HTTPS.
 
 ## Getting paid
 
