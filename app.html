@@ -2,9 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#1a1c22">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>FrameCraft Studio — Photo & Video Editor</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="favicon.svg">
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/photo.css">
   <link rel="stylesheet" href="css/video.css">
@@ -12,14 +17,14 @@
 <body>
   <div class="app">
     <header class="topbar">
-      <a class="brand" href="index.html"><span class="logo"></span>FrameCraft</a>
+      <a class="brand" href="index.html"><span class="logo"></span><span class="brand-name">FrameCraft</span></a>
       <nav class="tabs" id="mode-tabs">
         <button data-mode="photo" class="active">Photo</button>
         <button data-mode="video">Video</button>
       </nav>
       <div class="spacer"></div>
       <span id="plan-status" class="muted"></span>
-      <button class="btn primary" id="upgrade-btn">Upgrade to Pro</button>
+      <button class="btn primary" id="upgrade-btn"></button>
     </header>
     <div class="workspace">
       <section class="mode" id="photo-root"></section>

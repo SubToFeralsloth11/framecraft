@@ -1,5 +1,7 @@
 // Small shared UI helpers used by the shell and both editors.
 
+import { iconEl } from './icons.js';
+
 export function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -26,9 +28,9 @@ export function toast(message, kind = 'info', ms = 2600) {
 // Modal dialog. `body` is a Node; returns { close }.
 export function modal(title, body, { onClose } = {}) {
   const close = () => { wrap.remove(); onClose?.(); };
-  const wrap = el('div', { class: 'modal-wrap', onmousedown: (e) => e.target === wrap && close() },
+  const wrap = el('div', { class: 'modal-wrap', onpointerdown: (e) => e.target === wrap && close() },
     el('div', { class: 'modal', role: 'dialog', 'aria-label': title },
-      el('div', { class: 'modal-head' }, el('h2', {}, title), el('button', { class: 'icon-btn', title: 'Close', onclick: close }, '✕')),
+      el('div', { class: 'modal-head' }, el('h2', {}, title), el('button', { class: 'icon-btn', title: 'Close', 'aria-label': 'Close', onclick: close }, iconEl('close'))),
       body));
   document.body.append(wrap);
   return { close };

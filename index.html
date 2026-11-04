@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0e0f13">
   <title>FrameCraft Studio: Photo & Video Editor in Your Browser</title>
   <meta name="description" content="Edit photos and videos in your browser with layers, 40+ tools, filters, a multi-track timeline and 4K export. Nothing to install and nothing uploaded. Free to start.">
   <meta property="og:title" content="FrameCraft Studio">
@@ -28,12 +29,12 @@
   </section>
 
   <section id="features" class="features">
-    <div class="card"><h3>🖌️ Pro-grade photo tools</h3><p>Layers with 16 blend modes, brush, clone stamp, healing-style smudge, dodge &amp; burn, magic wand, lasso, crop, gradient, shapes and text.</p></div>
-    <div class="card"><h3>🎚️ Real color control</h3><p>Levels, curves, hue/saturation, vibrance, temperature, color balance, plus one-click looks like Vivid, Noir and Vintage.</p></div>
-    <div class="card"><h3>🎬 Multi-track video timeline</h3><p>Trim, split, ripple delete, speed ramps, keyframes, fades and transitions. Stack video, images, titles and audio.</p></div>
-    <div class="card"><h3>🟩 Green screen</h3><p>Chroma key for photos and video. Remove a background by color in one click.</p></div>
-    <div class="card"><h3>✍️ Animated titles</h3><p>Fade, slide, typewriter and pop-in text with stroke, shadow and background boxes.</p></div>
-    <div class="card"><h3>🔒 Private by design</h3><p>All editing happens on your device. Nothing is uploaded and nobody sees your files.</p></div>
+    <div class="card"><span class="fi" data-icon="brush"></span><h3>Pro-grade photo tools</h3><p>Layers with 16 blend modes, brush, clone stamp, smudge, dodge &amp; burn, magic wand, lasso, crop, gradient, shapes and text.</p></div>
+    <div class="card"><span class="fi" data-icon="sliders"></span><h3>Real color control</h3><p>Levels, curves, hue/saturation, vibrance, temperature, color balance, plus one-click looks like Vivid, Noir and Vintage.</p></div>
+    <div class="card"><span class="fi" data-icon="film"></span><h3>Multi-track video timeline</h3><p>Trim, split, ripple delete, speed ramps, keyframes, fades and transitions. Stack video, images, titles and audio.</p></div>
+    <div class="card"><span class="fi" data-icon="greenscreen"></span><h3>Green screen</h3><p>Chroma key for photos and video. Remove a background by color in one click.</p></div>
+    <div class="card"><span class="fi" data-icon="title"></span><h3>Animated titles</h3><p>Fade, slide, typewriter and pop-in text with stroke, shadow and background boxes.</p></div>
+    <div class="card"><span class="fi" data-icon="shield"></span><h3>Private by design</h3><p>All editing happens on your device, phone or computer. Nothing is uploaded and nobody sees your files.</p></div>
   </section>
 
   <section id="pricing" class="pricing">
@@ -71,7 +72,7 @@
 
   <section id="faq" class="faq">
     <h2>FAQ</h2>
-    <details><summary>Do I need to install anything?</summary><p>No. FrameCraft runs in Chrome, Edge, Safari and Firefox on Mac, Windows and Chromebook.</p></details>
+    <details><summary>Do I need to install anything?</summary><p>No. FrameCraft runs in Chrome, Edge, Safari and Firefox on Mac, Windows, Chromebook, iPhone, iPad and Android. On a phone you edit with touch: pinch to zoom, two fingers to pan.</p></details>
     <details><summary>Are my files uploaded?</summary><p>No. Everything is processed on your device and your files never leave it.</p></details>
     <details><summary>How do I activate Pro?</summary><p>After checkout you get a license key by email. Click <b>Upgrade to Pro</b> in the editor and paste it in.</p></details>
     <details><summary>Can I cancel?</summary><p>Yes, any time. Pro stays active until the end of the period you paid for.</p></details>
@@ -81,6 +82,8 @@
 
   <script type="module">
     import { CONFIG } from './js/config.js';
+    import { icon } from './js/icons.js';
+    document.querySelectorAll('[data-icon]').forEach((n) => { n.innerHTML = icon(n.dataset.icon, 24); });
     document.querySelectorAll('[data-price]').forEach((n) => { n.textContent = n.dataset.price === 'yearly' ? CONFIG.priceYearly : CONFIG.priceMonthly; });
     if (CONFIG.stripeMonthlyLink) document.getElementById('buy-monthly').href = CONFIG.stripeMonthlyLink;
     if (CONFIG.stripeYearlyLink) document.getElementById('buy-yearly').href = CONFIG.stripeYearlyLink;

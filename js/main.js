@@ -2,6 +2,7 @@
 import { CONFIG } from './config.js';
 import { License } from './license.js';
 import { el, modal, toast } from './ui.js';
+import { iconEl } from './icons.js';
 
 const roots = { photo: document.getElementById('photo-root'), video: document.getElementById('video-root') };
 const mounted = {};
@@ -30,11 +31,11 @@ function renderStatus() {
   if (info) {
     status.innerHTML = '';
     status.append(el('span', { class: 'pro-badge' }, 'PRO'), info.expires ? ` until ${new Date(info.expires).toLocaleDateString()}` : ' lifetime');
-    btn.textContent = 'License';
+    btn.replaceChildren(iconEl('key', 16), el('span', {}, 'License'));
     btn.classList.remove('primary');
   } else {
     status.textContent = 'Free plan';
-    btn.textContent = 'Upgrade to Pro';
+    btn.replaceChildren(iconEl('star', 16), el('span', { class: 'plan-long' }, 'Upgrade to Pro'), el('span', { class: 'plan-short' }, 'Pro'));
     btn.classList.add('primary');
   }
 }
@@ -50,7 +51,7 @@ function openUpgrade(feature) {
   const keyInput = el('textarea', { rows: 3, placeholder: 'Paste your license key (FC1.…)', style: { width: '100%', resize: 'vertical' } });
   const activate = async () => {
     const r = await License.activate(keyInput.value);
-    if (r.ok) { toast('Pro unlocked. Thank you! 🎉', 'ok'); dlg.close(); } else toast(r.error, 'err', 4000);
+    if (r.ok) { toast('Pro unlocked. Thank you!', 'ok'); dlg.close(); } else toast(r.error, 'err', 4000);
   };
   const body = el('div', { class: 'modal-body' },
     feature && !info ? el('p', { style: { margin: 0 } }, el('b', {}, feature), ' is a Pro feature.') : null,

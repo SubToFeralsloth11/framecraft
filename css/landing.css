@@ -39,3 +39,19 @@ details { background: var(--panel); border: 1px solid var(--line); border-radius
 summary { cursor: pointer; font-weight: 600; }
 details p { color: var(--muted); margin: 10px 0 0; }
 .foot { text-align: center; color: var(--muted); padding: 40px 24px; font-size: 14px; }
+.fi { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; margin-bottom: 12px; color: #fff; background: linear-gradient(135deg, #6c8cff33, #b06cff33); border: 1px solid #6c8cff55; }
+.fi .ic { color: #c9d3ff; }
+body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); overflow-x: hidden; }
+@media (max-width: 759px) {
+  .nav { gap: 12px; padding: 14px 16px; }
+  .nav nav { display: none; }
+  .nav .brand { flex: 1; }
+  .hero { padding: 48px 18px 36px; }
+  .hero h1 { letter-spacing: -1px; }
+  .hero p { font-size: 17px; }
+  .cta .btn.big { width: 100%; }
+  .features { grid-template-columns: 1fr; padding: 24px 16px; }
+  .pricing, .faq { padding: 40px 16px; }
+  .pricing h2, .faq h2 { font-size: 28px; }
+  .tier { padding: 22px; }
+}
