@@ -7,10 +7,12 @@ export function el(tag, attrs = {}, ...children) {
     if (k === 'class') node.className = v;
     else if (k === 'style' && typeof v === 'object') Object.assign(node.style, v);
     else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
+    else if (k === 'value') continue; // applied last so min/max/step are already set on ranges
     else if (k in node && typeof v !== 'string') node[k] = v;
     else node.setAttribute(k, v === true ? '' : v);
   }
-  for (const c of children.flat()) if (c != null && c !== false) node.append(c instanceof Node ? c : String(c));
+  if (attrs.value != null) node.value = attrs.value;
+  for (const c of children.flat(Infinity)) if (c != null && c !== false) node.append(c instanceof Node ? c : String(c));
   return node;
 }
 
