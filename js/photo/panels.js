@@ -3,7 +3,7 @@ import { el } from '../ui.js';
 import { CONFIG } from '../config.js';
 import { License } from '../license.js';
 import { BLEND_MODES } from './doc.js';
-import { iconEl } from './icons.js';
+import { iconEl } from '../icons.js';
 
 const BLEND_LABELS = { normal: 'Normal', multiply: 'Multiply', screen: 'Screen', overlay: 'Overlay', darken: 'Darken', lighten: 'Lighten',
   'color-dodge': 'Color dodge', 'color-burn': 'Color burn', 'hard-light': 'Hard light', 'soft-light': 'Soft light', difference: 'Difference',

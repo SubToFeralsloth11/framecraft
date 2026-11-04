@@ -4,7 +4,7 @@ import { License, requirePro } from '../license.js';
 import { Doc } from './doc.js';
 import { View } from './view.js';
 import { makeCanvas } from './canvas.js';
-import { iconEl } from './icons.js';
+import { iconEl } from '../icons.js';
 import { paintTools } from './tools-paint.js';
 import { selectTools } from './tools-select.js';
 import { otherTools } from './tools-other.js';
