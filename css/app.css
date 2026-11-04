@@ -22,7 +22,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .tabs button.active { background: var(--panel2); color: var(--fg); }
 .spacer { flex: 1; }
 .workspace { position: relative; min-height: 0; }
-.workspace > .mode { position: absolute; inset: 0; }
+.workspace > .mode { position: absolute; inset: 0; overflow: hidden; overflow: clip; } /* clip: off-screen drawers must never scroll the editor sideways */
 
 /* Controls */
 .btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel2); padding: 5px 11px; border-radius: 6px; cursor: pointer; white-space: nowrap; }

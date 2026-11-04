@@ -23,6 +23,7 @@ document.getElementById('mode-tabs').addEventListener('click', (e) => {
   const mode = e.target.closest('button')?.dataset.mode;
   if (mode) show(mode);
 });
+window.addEventListener('hashchange', () => show(location.hash === '#video' ? 'video' : 'photo'));
 
 function renderStatus() {
   const info = License.info();
