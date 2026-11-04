@@ -1,6 +1,7 @@
 // Left panel: Media bin, Titles & graphics, Transitions and Effects tabs. Items are draggable onto
-// the timeline (or clips) and can also be clicked to add / apply.
+// the timeline (or clips) and can also be clicked / tapped to add or apply (the touch path).
 import { el, pickFiles, toast } from '../ui.js';
+import { iconEl } from '../icons.js';
 import { timecode, TRANSITIONS } from './model.js';
 import { EFFECTS } from './looks.js';
 import { SHAPES } from './gen.js';
@@ -27,12 +28,13 @@ const BACKGROUNDS = [
   { name: 'Candy', fill: { mode: 'linear', c1: '#f857a6', c2: '#ff5858', angle: 160 } },
 ];
 const SHAPE_COLORS = { rect: '#6c8cff', ellipse: '#3ecf8e', triangle: '#f5b74e', star: '#ffd93d', heart: '#ff5c6c' };
-const TRANS_ICONS = { crossfade: '◐', dip: '●', wipe: '▶|', slide: '⇆', zoom: '⤢' };
+const TRANS_ICONS = { crossfade: 'crossfade', dip: 'dip', wipe: 'wipe', slide: 'slide', zoom: 'zoomT' };
+export const TABS = { media: 'Media', titles: 'Titles', transitions: 'Transitions', effects: 'Effects' };
 
 export class Panels {
   constructor(ed, host) {
     this.ed = ed;
-    this.tabs = { media: 'Media', titles: 'Titles', transitions: 'Transitions', effects: 'Effects' };
+    this.tabs = TABS;
     this.bar = el('div', { class: 'vt-tabs' }, Object.entries(this.tabs).map(([k, n]) =>
       el('button', { 'data-tab': k, onclick: () => this.show(k) }, n)));
     this.body = el('div', { class: 'vt-panel-body' });
@@ -55,7 +57,11 @@ export class Panels {
     this.bar.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
     this.body.textContent = '';
     this.body.append(this[tab]());
+    this.onShow?.(tab);
   }
+
+  // After a click / tap added something: lets the layout close its sheet on phones.
+  picked() { this.ed.picked?.(); }
 
   draggable(node, payload, label) {
     node.draggable = true;
@@ -71,26 +77,26 @@ export class Panels {
   media() {
     const { media, actions, store } = this.ed;
     const items = media.list();
-    const importBtn = el('button', { class: 'btn primary', onclick: async () => actions.importFiles(await pickFiles(ACCEPT, true)) }, '＋ Import media');
+    const importBtn = el('button', { class: 'btn primary', onclick: async () => actions.importFiles(await pickFiles(ACCEPT, true)) }, iconEl('plus', 16), 'Import media');
     const grid = el('div', { class: 'vt-bin' }, items.map((m) => {
       const used = store.p.clips.filter((c) => c.mediaId === m.id).length;
       const thumb = m.thumb
         ? el('div', { class: 'vt-thumb', style: { backgroundImage: `url("${m.thumb}")` } })
-        : el('div', { class: 'vt-thumb vt-audio-thumb' }, '♪');
+        : el('div', { class: 'vt-thumb vt-audio-thumb' }, iconEl('music', 18));
       const node = el('div', { class: 'vt-item', title: `${m.name}\nDouble-click or + to add at the playhead; drag onto a track to place it.` },
         thumb,
         el('div', { class: 'vt-item-meta' },
           el('div', { class: 'vt-item-name' }, m.name),
           el('div', { class: 'muted' }, m.kind === 'image' ? `Image · ${m.width}×${m.height}` : `${m.kind === 'video' ? 'Video' : 'Audio'} · ${timecode(m.duration)}`, used ? ` · used ${used}×` : '')),
         el('div', { class: 'vt-item-actions' },
-          el('button', { class: 'icon-btn', title: 'Add to timeline at playhead', onclick: () => actions.addMedia(m) }, '＋'),
-          el('button', { class: 'icon-btn', title: 'Remove from project', onclick: () => this.removeMedia(m, used) }, '✕')));
+          el('button', { class: 'icon-btn vt-add', title: 'Add to timeline at playhead', onclick: () => { if (actions.addMedia(m).length) this.picked(); } }, iconEl('plus', 16), el('span', { class: 'vt-mob-lbl' }, 'Add')),
+          el('button', { class: 'icon-btn', title: 'Remove from project', onclick: () => this.removeMedia(m, used) }, iconEl('close', 16))));
       node.addEventListener('dblclick', () => actions.addMedia(m));
       return this.draggable(node, { type: 'media', id: m.id }, m.name);
     }));
     return el('div', { class: 'vt-stack' },
       importBtn,
-      items.length ? grid : el('div', { class: 'vt-empty-bin' }, el('div', { class: 'vt-big' }, '⬇'), 'Drop video, audio or image files here', el('div', { class: 'muted' }, 'Files stay on your computer.')));
+      items.length ? grid : el('div', { class: 'vt-empty-bin' }, iconEl('download', 28), el('span', { class: 'vt-desk-txt' }, 'Drop video, audio or image files here'), el('span', { class: 'vt-mob' }, 'Tap Import media to add video, audio or images'), el('div', { class: 'muted' }, 'Files stay on your device.')));
   }
 
   removeMedia(m, used) {
@@ -103,8 +109,9 @@ export class Panels {
   titles() {
     const { actions } = this.ed;
     const tile = (label, kind, props, style, inner = label) =>
-      this.draggable(el('div', { class: 'vt-tile', role: 'button', style, title: `${label} — click to add at playhead, or drag onto a track`, onclick: () => actions.addGenerated(kind, structuredClone(props)) }, inner), { type: 'gen', kind, props }, label);
+      this.draggable(el('div', { class: 'vt-tile', role: 'button', style, title: `${label} — click to add at playhead, or drag onto a track`, onclick: () => { if (actions.addGenerated(kind, structuredClone(props)).length) this.picked(); } }, inner), { type: 'gen', kind, props }, label);
     return el('div', { class: 'vt-stack' },
+      el('p', { class: 'muted vt-small vt-mob' }, 'Tap a tile to add it at the playhead.'),
       el('div', { class: 'panel-title' }, 'Titles'),
       el('div', { class: 'vt-tiles' }, TITLE_PRESETS.map((t) => tile(t.name, 'text', t.props, {
         fontFamily: t.props.text.font === 'georgia' ? 'Georgia, serif' : t.props.text.font === 'impact' ? 'Impact, sans-serif' : t.props.text.font === 'courier' ? 'Courier New, monospace' : '',
@@ -124,12 +131,13 @@ export class Panels {
     const apply = (type) => {
       const c = store.selected()[0];
       if (!c) return toast('Select a clip first, or drag the transition onto the cut between two clips', 'warn', 3500);
-      actions.applyTransition(c.id, type, 'start');
+      if (actions.applyTransition(c.id, type, 'start')) this.picked();
     };
     return el('div', { class: 'vt-stack' },
-      el('p', { class: 'muted vt-small' }, 'Drag onto a clip edge that touches another clip (left half = cut before it, right half = cut after it), or select a clip and click.'),
+      el('p', { class: 'muted vt-small vt-desk-txt' }, 'Drag onto a clip edge that touches another clip (left half = cut before it, right half = cut after it), or select a clip and click.'),
+      el('p', { class: 'muted vt-small vt-mob' }, 'Select a clip that touches another clip, then tap a transition to put it on that cut.'),
       el('div', { class: 'vt-tiles' }, Object.entries(TRANSITIONS).map(([k, n]) =>
-        this.draggable(el('div', { class: 'vt-tile', role: 'button', title: `${n} — drag onto a cut or click to apply`, onclick: () => apply(k) }, el('span', { class: 'vt-big' }, TRANS_ICONS[k]), n), { type: 'transition', id: k }, n))));
+        this.draggable(el('div', { class: 'vt-tile', role: 'button', title: `${n} — drag onto a cut or click to apply`, onclick: () => apply(k) }, iconEl(TRANS_ICONS[k] || 'crossfade', 26), n), { type: 'transition', id: k }, n))));
   }
 
   effects() {
@@ -137,11 +145,12 @@ export class Panels {
     const apply = (type) => {
       const c = store.selected()[0];
       if (!c) return toast('Select a clip first, or drag the effect onto a clip', 'warn');
-      actions.applyEffect(c.id, type);
+      if (actions.applyEffect(c.id, type)) this.picked();
     };
     return el('div', { class: 'vt-stack' },
-      el('p', { class: 'muted vt-small' }, 'Drag an effect onto a clip, or select a clip and click. Tweak or remove it in the Inspector. Colour looks are in the Inspector’s Color section.'),
+      el('p', { class: 'muted vt-small vt-desk-txt' }, 'Drag an effect onto a clip, or select a clip and click. Tweak or remove it in the Inspector. Colour looks are in the Inspector’s Color section.'),
+      el('p', { class: 'muted vt-small vt-mob' }, 'Select a clip, then tap an effect. Tweak or remove it in the Inspector.'),
       el('div', { class: 'vt-tiles' }, Object.entries(EFFECTS).map(([k, f]) =>
-        this.draggable(el('div', { class: 'vt-tile', role: 'button', title: `${f.name} — drag onto a clip or click to apply`, onclick: () => apply(k) }, el('span', { class: 'vt-big' }, f.icon), f.name), { type: 'effect', id: k }, f.name))));
+        this.draggable(el('div', { class: 'vt-tile', role: 'button', title: `${f.name} — drag onto a clip or click to apply`, onclick: () => apply(k) }, iconEl(f.icon, 26), f.name), { type: 'effect', id: k }, f.name))));
   }
 }

@@ -180,6 +180,7 @@ export function createActions(ed) {
       });
       store.select([id]);
       toast(`${TRANSITIONS[type]} added`, 'ok');
+      return true;
     },
 
     applyEffect(clipId, type) {
@@ -192,6 +193,7 @@ export function createActions(ed) {
       });
       store.select([clipId]);
       toast(`${EFFECTS[type].name} applied`, 'ok');
+      return true;
     },
 
     selectAll() { store.select(store.p.clips.map((c) => c.id)); },

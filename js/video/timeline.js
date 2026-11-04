@@ -1,27 +1,36 @@
 // Multi-track timeline: ruler, playhead, track headers, clips with move / trim / multi-select,
-// snapping, zoom, drag-and-drop targets and a clip context menu.
+// snapping, zoom, drag-and-drop targets and a clip context menu. Touch: one finger drags clips /
+// trims / scrubs, long-press opens the clip menu, two fingers pinch-zoom and pan.
 import { CONFIG } from '../config.js';
 import { License } from '../license.js';
 import { el } from '../ui.js';
+import { iconEl } from '../icons.js';
 import {
   FPS, clipEnd, clone, displayTracks, trackLabel, canHold, trackClips, trimStart, trimEnd, moveClips, snapTime,
   projectDuration, prevAdjacent, transDur, TRANSITIONS, KEY_PROPS, clamp,
 } from './model.js';
 
-const HEAD_W = 136;
 const ROW_H = { video: 58, audio: 46 };
 const MIN_PPS = 4, MAX_PPS = 480;
+const LONG_PRESS_MS = 480;
+const TRANS_ICONS = { crossfade: 'crossfade', dip: 'dip', wipe: 'wipe', slide: 'slide', zoom: 'zoomT' };
 const fmtRuler = (t, step) => {
   const m = Math.floor(t / 60), s = Math.floor(t % 60), f = Math.round((t % 1) * FPS);
   return step < 1 ? `${m}:${String(s).padStart(2, '0')}.${String(f).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
 };
+// Icon + text label; the label hides on phones (CSS) so the bar stays compact.
+const lbl = (name, text) => [iconEl(name, 16), el('span', { class: 'vt-lbl' }, text)];
 
 export class Timeline {
   constructor(ed, host) {
     this.ed = ed;
     this.pps = 60;
     this.snap = true;
+    this.multi = false; // on-screen "Select multiple" (touch equivalent of Shift-click)
+    this.hw = 136; // track header width; read from --vt-head-w on render
+    this.op = null; // in-progress one-pointer operation { cancel }
     this.build(host);
+    this.initTouch();
     ed.store.on(() => this.render());
     ed.media.on(() => this.render());
     ed.engine.on((type) => { if (type === 'time') this.updatePlayhead(); });
@@ -32,23 +41,25 @@ export class Timeline {
 
   build(host) {
     const { actions } = this.ed;
-    this.snapBtn = el('button', { class: 'icon-btn vt-on', title: 'Snapping (N)', onclick: () => this.toggleSnap() }, '🧲 Snap');
+    this.snapBtn = el('button', { class: 'icon-btn vt-on', title: 'Snapping (N)', onclick: () => this.toggleSnap() }, lbl('magnet', 'Snap'));
+    this.multiBtn = el('button', { class: 'icon-btn vt-mob', title: 'Select multiple clips (tap clips to add / remove)', onclick: () => this.toggleMulti() }, lbl('selAdd', 'Multi-select'));
     this.zoom = el('input', { type: 'range', min: 0, max: 1000, step: 1, title: 'Timeline zoom (+ / −)', oninput: () => this.setPps(MIN_PPS * Math.pow(MAX_PPS / MIN_PPS, this.zoom.value / 1000)) });
-    this.addV = el('button', { class: 'btn', onclick: () => actions.addTrack('video') }, '+ Video track');
-    this.addA = el('button', { class: 'btn', onclick: () => actions.addTrack('audio') }, '+ Audio track');
+    this.addV = el('button', { class: 'btn', title: 'Add a video track', onclick: () => actions.addTrack('video') }, iconEl('plus', 14), 'Video track');
+    this.addA = el('button', { class: 'btn', title: 'Add an audio track', onclick: () => actions.addTrack('audio') }, iconEl('plus', 14), 'Audio track');
     const bar = el('div', { class: 'vt-tl-bar' },
-      el('button', { class: 'icon-btn', title: 'Split at playhead (S)', onclick: () => actions.split() }, '✂ Split'),
-      el('button', { class: 'icon-btn', title: 'Delete (Del)', onclick: () => actions.deleteSelected(false) }, '🗑 Delete'),
-      el('button', { class: 'icon-btn', title: 'Ripple delete (Shift+Del)', onclick: () => actions.deleteSelected(true) }, '⇤ Ripple delete'),
-      el('button', { class: 'icon-btn', title: 'Duplicate (Ctrl/Cmd+D)', onclick: () => actions.duplicate() }, '⧉ Duplicate'),
+      el('button', { class: 'icon-btn', title: 'Split at playhead (S)', onclick: () => actions.split() }, lbl('scissors', 'Split')),
+      el('button', { class: 'icon-btn', title: 'Delete (Del)', onclick: () => actions.deleteSelected(false) }, lbl('trash', 'Delete')),
+      el('button', { class: 'icon-btn', title: 'Ripple delete (Shift+Del)', onclick: () => actions.deleteSelected(true) }, lbl('ripple', 'Ripple delete')),
+      el('button', { class: 'icon-btn', title: 'Duplicate (Ctrl/Cmd+D)', onclick: () => actions.duplicate() }, lbl('copy', 'Duplicate')),
       this.snapBtn,
+      this.multiBtn,
       el('span', { class: 'vt-sep' }),
       this.addV, this.addA,
       el('div', { class: 'spacer' }),
-      el('button', { class: 'icon-btn', title: 'Zoom out (−)', onclick: () => this.zoomBy(1 / 1.4) }, '−'),
+      el('button', { class: 'icon-btn', title: 'Zoom out (−)', onclick: () => this.zoomBy(1 / 1.4) }, iconEl('zoomOut', 16)),
       this.zoom,
-      el('button', { class: 'icon-btn', title: 'Zoom in (+)', onclick: () => this.zoomBy(1.4) }, '+'),
-      el('button', { class: 'icon-btn', title: 'Zoom to fit', onclick: () => this.fit() }, '⤢ Fit'));
+      el('button', { class: 'icon-btn', title: 'Zoom in (+)', onclick: () => this.zoomBy(1.4) }, iconEl('zoom', 16)),
+      el('button', { class: 'icon-btn', title: 'Zoom to fit', onclick: () => this.fit() }, lbl('fit', 'Fit')));
 
     this.ruler = el('canvas', { class: 'vt-ruler' });
     this.rows = el('div', { class: 'vt-rows' });
@@ -70,33 +81,101 @@ export class Timeline {
     document.addEventListener('pointerdown', (e) => { if (this.menu && !this.menu.contains(e.target)) this.closeMenu(); });
   }
 
+  // ---------- touch: pinch zoom / two-finger pan ----------
+  initTouch() {
+    this.touches = new Map(); // pointerId → { x, y } for touches that started in the timeline
+    this.pinch = null;
+    this.scroll.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') return;
+      this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.touches.size === 1) {
+        // One finger on the track headers pans the timeline (there is nothing to edit there).
+        if (e.target.closest('.vt-head, .vt-corner') && !e.target.closest('button')) { e.stopPropagation(); this.startPinch(); }
+        return;
+      }
+      // Second finger: drop whatever the first finger started, then zoom / pan.
+      e.stopPropagation();
+      e.preventDefault();
+      this.cancelOp();
+      this.closeMenu();
+      this.startPinch();
+    }, true);
+    const move = (e) => {
+      const t = this.touches.get(e.pointerId);
+      if (!t) return;
+      t.x = e.clientX;
+      t.y = e.clientY;
+      if (this.pinch && !this.pinchRaf) this.pinchRaf = requestAnimationFrame(() => { this.pinchRaf = 0; this.applyPinch(); });
+    };
+    const up = (e) => {
+      if (!this.touches.delete(e.pointerId)) return;
+      // Lifting one of two fingers ends the gesture; the remaining finger does nothing until lifted.
+      if (this.pinch && (this.pinch.n === 2 || !this.touches.size)) this.pinch = this.touches.size ? { dead: true } : null;
+      if (!this.touches.size) this.pinch = null;
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+    addEventListener('pointercancel', up);
+  }
+
+  touchPoints() {
+    const pts = [...this.touches.values()].slice(0, 2);
+    const mid = pts.length > 1 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : { ...pts[0] };
+    const dist = pts.length > 1 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
+    return { mid, dist, n: pts.length };
+  }
+
+  startPinch() {
+    const { mid, dist, n } = this.touchPoints();
+    const left = this.inner.getBoundingClientRect().left;
+    this.pinch = { n, d0: Math.max(10, dist), pps0: this.pps, t0: (mid.x - left - this.hw) / this.pps, y0: mid.y, top0: this.scroll.scrollTop };
+  }
+
+  applyPinch() {
+    const p = this.pinch;
+    if (!p || p.dead || !this.touches.size) return;
+    const { mid, dist, n } = this.touchPoints();
+    if (p.n === 2 && n === 2) {
+      const pps = clamp(p.pps0 * (dist / p.d0), MIN_PPS, MAX_PPS);
+      if (Math.abs(pps - this.pps) > 1e-3) { this.pps = pps; this.render(); }
+    }
+    // Keep the time that was under the fingers' midpoint under it (zoom anchor + horizontal pan).
+    const r = this.scroll.getBoundingClientRect();
+    this.scroll.scrollLeft = this.hw + p.t0 * this.pps - (mid.x - r.left);
+    this.scroll.scrollTop = p.top0 - (mid.y - p.y0);
+  }
+
+  cancelOp() { const op = this.op; this.op = null; op?.cancel(); }
+
   // ---------- geometry ----------
-  timeAtClient(x) { return Math.max(0, (x - this.inner.getBoundingClientRect().left - HEAD_W) / this.pps); }
+  timeAtClient(x) { return Math.max(0, (x - this.inner.getBoundingClientRect().left - this.hw) / this.pps); }
   contentWidth() {
     const dur = projectDuration(this.ed.store.p);
-    return Math.max((dur + 30) * this.pps, this.scroll.clientWidth - HEAD_W);
+    return Math.max((dur + 30) * this.pps, this.scroll.clientWidth - this.hw);
   }
 
   setPps(pps, anchor = this.ed.engine.t) {
-    const before = HEAD_W + anchor * this.pps - this.scroll.scrollLeft;
+    const before = this.hw + anchor * this.pps - this.scroll.scrollLeft;
     this.pps = clamp(pps, MIN_PPS, MAX_PPS);
     this.zoom.value = (Math.log(this.pps / MIN_PPS) / Math.log(MAX_PPS / MIN_PPS)) * 1000;
     this.render();
-    this.scroll.scrollLeft = HEAD_W + anchor * this.pps - before;
+    this.scroll.scrollLeft = this.hw + anchor * this.pps - before;
   }
   zoomBy(f, anchor) { this.setPps(this.pps * f, anchor); }
   fit() {
     const dur = Math.max(5, projectDuration(this.ed.store.p));
-    this.setPps((this.scroll.clientWidth - HEAD_W - 40) / dur, 0);
+    this.setPps((this.scroll.clientWidth - this.hw - 40) / dur, 0);
     this.scroll.scrollLeft = 0;
   }
   toggleSnap() { this.snap = !this.snap; this.snapBtn.classList.toggle('vt-on', this.snap); }
+  toggleMulti(on = !this.multi) { this.multi = on; this.multiBtn.classList.toggle('vt-on', on); }
 
   // ---------- render ----------
   render() {
     const { store, media } = this.ed, p = store.p;
+    this.hw = parseFloat(getComputedStyle(this.inner).getPropertyValue('--vt-head-w')) || 136;
     const width = this.contentWidth();
-    this.inner.style.width = HEAD_W + width + 'px';
+    this.inner.style.width = this.hw + width + 'px';
     const atLimit = p.tracks.length >= CONFIG.free.videoMaxTracks && !License.isPro();
     for (const b of [this.addV, this.addA]) b.querySelector('.pro-badge')?.remove();
     if (atLimit) { this.addV.append(el('span', { class: 'pro-badge' }, 'PRO')); this.addA.append(el('span', { class: 'pro-badge' }, 'PRO')); }
@@ -108,14 +187,13 @@ export class Timeline {
       const lane = el('div', { class: 'vt-lane', style: { width: width + 'px' } });
       lane.dataset.track = tr.id;
       this.lanes.set(tr.id, lane);
-      const head = el('div', { class: `vt-head vt-${tr.kind}` },
-        el('b', {}, trackLabel(p, tr)),
-        tr.kind === 'video' ? el('button', { class: 'icon-btn' + (tr.hidden ? ' vt-off' : ''), title: tr.hidden ? 'Show track' : 'Hide track', onclick: () => this.ed.actions.toggleTrack(tr.id, 'hidden') }, tr.hidden ? '◌' : '👁') : null,
-        el('button', { class: 'icon-btn' + (tr.muted ? ' vt-off' : ''), title: tr.muted ? 'Unmute track' : 'Mute track', onclick: () => this.ed.actions.toggleTrack(tr.id, 'muted') }, tr.muted ? '🔇' : '🔊'),
-        el('button', { class: 'icon-btn', title: 'Remove track', onclick: () => this.ed.actions.removeTrack(tr.id) }, '✕'));
-      const row = el('div', { class: `vt-row vt-${tr.kind}`, style: { height: ROW_H[tr.kind] + 'px' } }, head, lane);
+      const row = el('div', { class: `vt-row vt-${tr.kind}`, style: { height: ROW_H[tr.kind] + 'px' } }, this.head(tr), lane);
       this.rows.append(row);
-      lane.addEventListener('pointerdown', (e) => { if (e.target === lane) { if (!e.shiftKey) store.select([]); this.scrub(e); } });
+      lane.addEventListener('pointerdown', (e) => {
+        if (e.target !== lane || e.button !== 0) return;
+        if (!e.shiftKey && !this.multi) store.select([]);
+        this.scrub(e);
+      });
       this.dropTarget(lane, tr);
       for (const c of trackClips(p, tr.id)) lane.append(this.clipEl(c, tr, media));
       // transition markers
@@ -127,11 +205,41 @@ export class Timeline {
           class: 'vt-trans', title: `${TRANSITIONS[c.trans.type]} (${d.toFixed(2)} s) — click to edit`,
           style: { left: (c.start - d / 2) * this.pps + 'px', width: Math.max(10, d * this.pps) + 'px' },
           onpointerdown: (e) => { e.stopPropagation(); store.select([c.id]); },
-        }, '⧉'));
+        }, iconEl(TRANS_ICONS[c.trans.type] || 'crossfade', 12)));
       }
     }
     this.drawRuler();
     this.updatePlayhead();
+  }
+
+  // Track header. Desktop: name + hide / mute / remove buttons. Touch / phone (CSS): name + state
+  // icons + one "more" button that opens the same actions as a menu.
+  head(tr) {
+    const { actions, store } = this.ed;
+    const p = store.p;
+    const hide = () => actions.toggleTrack(tr.id, 'hidden');
+    const mute = () => actions.toggleTrack(tr.id, 'muted');
+    const remove = () => actions.removeTrack(tr.id);
+    const more = el('button', {
+      class: 'icon-btn vt-head-more', title: 'Track options',
+      onclick: (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        this.popMenu(r.left, r.bottom + 4, [
+          tr.kind === 'video' ? [tr.hidden ? 'Show track' : 'Hide track', '', hide] : null,
+          [tr.muted ? 'Unmute track' : 'Mute track', '', mute],
+          ['Remove track', '', remove],
+        ]);
+      },
+    }, iconEl('more', 16));
+    return el('div', { class: `vt-head vt-${tr.kind}` },
+      el('b', {}, trackLabel(p, tr)),
+      el('span', { class: 'vt-head-state' },
+        tr.kind === 'video' && tr.hidden ? iconEl('eyeOff', 12) : null,
+        tr.muted ? iconEl('mute', 12) : null),
+      tr.kind === 'video' ? el('button', { class: 'icon-btn vt-hb' + (tr.hidden ? ' vt-off' : ''), title: tr.hidden ? 'Show track' : 'Hide track', onclick: hide }, iconEl(tr.hidden ? 'eyeOff' : 'eye', 15)) : null,
+      el('button', { class: 'icon-btn vt-hb' + (tr.muted ? ' vt-off' : ''), title: tr.muted ? 'Unmute track' : 'Mute track', onclick: mute }, iconEl(tr.muted ? 'mute' : 'volume', 15)),
+      el('button', { class: 'icon-btn vt-hb', title: 'Remove track', onclick: remove }, iconEl('close', 15)),
+      more);
   }
 
   clipEl(c, tr, media) {
@@ -151,9 +259,11 @@ export class Timeline {
     if (c.speed !== 1) badges.push(`${c.speed}x`);
     if (c.effects.length) badges.push(`fx${c.effects.length}`);
     if (c.chroma.on) badges.push('key');
-    if (Object.keys(c.keyframes).some((k) => c.keyframes[k]?.length)) badges.push('◆');
-    if (c.muted) badges.push('🔇');
-    const label = c.kind === 'text' ? `T  ${c.text.content.split('\n')[0] || 'Text'}` : (offline ? '⚠ ' : '') + c.name;
+    if (Object.keys(c.keyframes).some((k) => c.keyframes[k]?.length)) badges.push(iconEl('keyframe', 9));
+    if (c.muted) badges.push(iconEl('mute', 10));
+    const label = c.kind === 'text'
+      ? [iconEl('text', 12), c.text.content.split('\n')[0] || 'Text']
+      : [offline ? iconEl('warn', 12) : null, c.name];
     node.append(el('div', { class: 'vt-clip-label' }, label, ...badges.map((b) => el('span', { class: 'vt-badge' }, b))));
     if (c.fadeIn > 0) node.append(el('div', { class: 'vt-fade in', style: { width: c.fadeIn * this.pps + 'px' } }));
     if (c.fadeOut > 0) node.append(el('div', { class: 'vt-fade out', style: { width: c.fadeOut * this.pps + 'px' } }));
@@ -162,7 +272,11 @@ export class Timeline {
     for (const kt of keyTimes) if (+kt >= 0 && +kt <= c.duration) node.append(el('i', { class: 'vt-key', style: { left: +kt * this.pps + 'px' } }));
     node.append(el('div', { class: 'vt-h l', title: 'Trim start' }), el('div', { class: 'vt-h r', title: 'Trim end' }));
     node.addEventListener('pointerdown', (e) => this.clipDown(e, c));
-    node.addEventListener('contextmenu', (e) => { e.preventDefault(); this.openMenu(e, c); });
+    node.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (performance.now() - (this.lpAt || 0) < 1200) return; // our long-press already opened it
+      this.openMenu(e, c);
+    });
     node.addEventListener('dragover', (e) => { if (this.ed.drag?.type === 'transition' || this.ed.drag?.type === 'effect') { e.preventDefault(); e.stopPropagation(); node.classList.add('drop'); } });
     node.addEventListener('dragleave', () => node.classList.remove('drop'));
     node.addEventListener('drop', (e) => {
@@ -195,7 +309,7 @@ export class Timeline {
   }
 
   drawRuler() {
-    const cv = this.ruler, w = Math.max(1, this.scroll.clientWidth - HEAD_W), h = 24, dpr = devicePixelRatio || 1;
+    const cv = this.ruler, w = Math.max(1, this.scroll.clientWidth - this.hw), h = 24, dpr = devicePixelRatio || 1;
     if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = h * dpr; cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
     const ctx = cv.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -220,23 +334,35 @@ export class Timeline {
 
   updatePlayhead() {
     const t = this.ed.engine.t;
-    const x = HEAD_W + t * this.pps;
+    const x = this.hw + t * this.pps;
     this.playhead.style.transform = `translateX(${x}px)`;
     if (this.ed.engine.playing) {
-      const s = this.scroll, vis = s.scrollLeft + HEAD_W, right = s.scrollLeft + s.clientWidth;
-      if (x > right - 40 || x < vis) s.scrollLeft = x - HEAD_W - 40;
+      const s = this.scroll, vis = s.scrollLeft + this.hw, right = s.scrollLeft + s.clientWidth;
+      if (x > right - 40 || x < vis) s.scrollLeft = x - this.hw - 40;
     }
   }
 
   // ---------- interactions ----------
   scrub(e) {
     const { engine } = this.ed;
+    if (this.touches.size > 1) return;
     if (engine.playing) engine.pause();
-    const move = (ev) => engine.seek(this.timeAtClient(ev.clientX));
+    const t0 = engine.t, id = e.pointerId;
+    const move = (ev) => { if (ev.pointerId === id) engine.seek(this.timeAtClient(ev.clientX)); };
+    const stop = () => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      removeEventListener('pointercancel', up);
+      if (this.op === op) this.op = null;
+    };
+    const up = (ev) => { if (ev.pointerId === id) stop(); };
+    const op = { cancel: () => { stop(); engine.seek(t0); } };
+    this.cancelOp();
+    this.op = op;
     move(e);
-    const up = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', up); };
     addEventListener('pointermove', move);
     addEventListener('pointerup', up);
+    addEventListener('pointercancel', up);
   }
 
   snapTargets(exclude) {
@@ -248,26 +374,57 @@ export class Timeline {
   clipDown(e, c) {
     if (e.button !== 0) return;
     e.stopPropagation();
+    if (this.touches.size > 1) return;
     const { store } = this.ed;
+    const touch = e.pointerType === 'touch';
     const handle = e.target.classList.contains('vt-h') ? (e.target.classList.contains('l') ? 'l' : 'r') : null;
     const wasSelected = store.selection.has(c.id);
     if (e.shiftKey && !handle) { store.select([c.id], true); return; }
-    if (!wasSelected) store.select([c.id]);
-    const startX = e.clientX, startY = e.clientY;
-    let moved = false, cancel = null;
+    const multi = this.multi && !handle;
+    if (!wasSelected && !multi) store.select([c.id]);
+    const id = e.pointerId, startX = e.clientX, startY = e.clientY;
+    const threshold = touch ? 8 : 4;
+    let moved = false, drag = null;
+    let lp = touch ? setTimeout(() => {
+      lp = null;
+      if (moved || this.op !== op) return;
+      stop();
+      this.lpAt = performance.now();
+      navigator.vibrate?.(12);
+      this.openMenu({ clientX: startX, clientY: startY }, c);
+    }, LONG_PRESS_MS) : null;
     const move = (ev) => {
-      if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
-      if (!moved) { moved = true; cancel = handle ? this.beginTrim(c, handle) : this.beginMove(c); }
-      cancel.move(ev, (ev.clientX - startX) / this.pps);
+      if (ev.pointerId !== id) return;
+      if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) < threshold) return;
+      if (!moved) {
+        moved = true;
+        clearTimeout(lp);
+        if (multi && !store.selection.has(c.id)) store.select([c.id], true);
+        drag = handle ? this.beginTrim(c, handle) : this.beginMove(c);
+      }
+      drag.move(ev, (ev.clientX - startX) / this.pps);
     };
-    const up = (ev) => {
+    const stop = () => {
+      clearTimeout(lp);
       removeEventListener('pointermove', move);
       removeEventListener('pointerup', up);
-      if (moved) cancel.commit(ev);
+      removeEventListener('pointercancel', abort);
+      if (this.op === op) this.op = null;
+    };
+    const up = (ev) => {
+      if (ev.pointerId !== id) return;
+      stop();
+      if (moved) drag.commit(ev);
+      else if (multi) store.select([c.id], true);
       else if (wasSelected && store.selection.size > 1) store.select([c.id]);
     };
+    const abort = (ev) => { if (ev.pointerId === id) op.cancel(); };
+    const op = { cancel: () => { stop(); if (moved) drag.abort(); } };
+    this.cancelOp();
+    this.op = op;
     addEventListener('pointermove', move);
     addEventListener('pointerup', up);
+    addEventListener('pointercancel', abort);
   }
 
   beginTrim(c, side) {
@@ -305,6 +462,7 @@ export class Timeline {
           else trimEnd(x, clipEnd(r), maxEnd);
         });
       },
+      abort: () => { this.hideSnapLine(); this.render(); },
     };
   }
 
@@ -336,6 +494,7 @@ export class Timeline {
         moves = group.map((g) => ({ id: g.id, start: g.start + d, trackId: tracks[rowOf(g.trackId) + delta].id }));
         for (const m of moves) {
           const n = nodes.get(m.id);
+          if (!n) continue;
           n.style.left = m.start * this.pps + 'px';
           const lane = this.lanes.get(m.trackId);
           if (n.parentNode !== lane) lane.append(n);
@@ -348,12 +507,13 @@ export class Timeline {
         if (moves.length) store.mutate((q) => moveClips(q, moves));
         else this.render();
       },
+      abort: () => { this.hideSnapLine(); this.render(); },
     };
   }
 
   showSnapLine(t) {
     this.dropLine.classList.remove('hidden');
-    this.dropLine.style.transform = `translateX(${HEAD_W + t * this.pps}px)`;
+    this.dropLine.style.transform = `translateX(${this.hw + t * this.pps}px)`;
   }
   hideSnapLine() { this.dropLine.classList.add('hidden'); }
 
@@ -389,23 +549,30 @@ export class Timeline {
   }
 
   openMenu(e, c) {
-    this.closeMenu();
     const { actions, store, engine } = this.ed;
-    if (!store.selection.has(c.id)) store.select([c.id]);
-    const item = (label, key, fn) => el('button', { onclick: () => { this.closeMenu(); fn(); } }, el('span', {}, label), el('kbd', {}, key));
+    if (!store.selection.has(c.id)) store.select([c.id], this.multi);
     const inside = engine.t > c.start && engine.t < clipEnd(c);
-    this.menu = el('div', { class: 'vt-menu', style: { left: e.clientX + 'px', top: e.clientY + 'px' } },
-      inside ? item('Split at playhead', 'S', () => actions.split()) : null,
-      item('Copy', '⌘C', () => actions.copy()),
-      item('Paste at playhead', '⌘V', () => actions.paste()),
-      item('Duplicate', '⌘D', () => actions.duplicate()),
-      c.trans ? item('Remove transition', '', () => store.mutate((p) => { const x = p.clips.find((k) => k.id === c.id); if (x) x.trans = null; })) : null,
-      item('Delete', 'Del', () => actions.deleteSelected(false)),
-      item('Ripple delete', '⇧Del', () => actions.deleteSelected(true)));
+    this.popMenu(e.clientX, e.clientY, [
+      inside ? ['Split at playhead', 'S', () => actions.split()] : null,
+      ['Copy', '⌘C', () => actions.copy()],
+      ['Paste at playhead', '⌘V', () => actions.paste()],
+      ['Duplicate', '⌘D', () => actions.duplicate()],
+      c.trans ? ['Remove transition', '', () => store.mutate((p) => { const x = p.clips.find((k) => k.id === c.id); if (x) x.trans = null; })] : null,
+      ['Delete', 'Del', () => actions.deleteSelected(false)],
+      ['Ripple delete', '⇧Del', () => actions.deleteSelected(true)],
+      this.ed.openInspector ? ['Edit in Inspector', '', () => this.ed.openInspector(), 'vt-mob'] : null,
+    ]);
+  }
+
+  // Fixed-position menu at (x, y), kept inside the viewport. items: [label, shortcut, fn, class?] | null.
+  popMenu(x, y, items) {
+    this.closeMenu();
+    const item = ([label, key, fn, cls]) => el('button', { class: cls || null, onclick: () => { this.closeMenu(); fn(); } }, el('span', {}, label), key ? el('kbd', {}, key) : null);
+    this.menu = el('div', { class: 'vt-menu', role: 'menu', style: { left: x + 'px', top: y + 'px' } }, items.filter(Boolean).map(item));
     this.ed.root.append(this.menu);
     const r = this.menu.getBoundingClientRect();
-    if (r.bottom > innerHeight) this.menu.style.top = innerHeight - r.height - 6 + 'px';
-    if (r.right > innerWidth) this.menu.style.left = innerWidth - r.width - 6 + 'px';
+    if (r.bottom > innerHeight - 6) this.menu.style.top = Math.max(6, innerHeight - r.height - 6) + 'px';
+    if (r.right > innerWidth - 6) this.menu.style.left = Math.max(6, innerWidth - r.width - 6) + 'px';
   }
   closeMenu() { this.menu?.remove(); this.menu = null; }
 }

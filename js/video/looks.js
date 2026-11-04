@@ -28,17 +28,17 @@ export const LOOKS = {
   faded: { name: 'Faded Film', css: { contrast: 0.85, saturate: 0.75 }, fade: 0.12, tone: { sh: [0.02, 0, 0.05], hi: [0.04, 0.02, 0] } },
 };
 
-// amount: 0–100 (default `def`); `fixed` effects have no amount slider.
+// amount: 0–100 (default `def`); `fixed` effects have no amount slider. `icon` is a js/icons.js name.
 export const EFFECTS = {
-  bw: { name: 'Black & White', icon: '◐', def: 100 },
-  sepia: { name: 'Sepia', icon: '☕', def: 80 },
-  invert: { name: 'Invert', icon: '⊘', def: 100 },
-  blur: { name: 'Gaussian Blur', icon: '◌', def: 30 },
-  pixelate: { name: 'Pixelate', icon: '▦', def: 40 },
-  mirror: { name: 'Mirror (flip)', icon: '⇋', fixed: true },
-  grain: { name: 'Film Grain', icon: '░', def: 35 },
-  posterize: { name: 'Posterize', icon: '▤', def: 50 },
-  glow: { name: 'Glow', icon: '✺', def: 50 },
+  bw: { name: 'Black & White', icon: 'contrast', def: 100 },
+  sepia: { name: 'Sepia', icon: 'sepia', def: 80 },
+  invert: { name: 'Invert', icon: 'invert', def: 100 },
+  blur: { name: 'Gaussian Blur', icon: 'blur', def: 30 },
+  pixelate: { name: 'Pixelate', icon: 'pixelate', def: 40 },
+  mirror: { name: 'Mirror (flip)', icon: 'mirror', fixed: true },
+  grain: { name: 'Film Grain', icon: 'grain', def: 35 },
+  posterize: { name: 'Posterize', icon: 'posterize', def: 50 },
+  glow: { name: 'Glow', icon: 'glow', def: 50 },
 };
 
 const MULT = new Set(['brightness', 'contrast', 'saturate']);

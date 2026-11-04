@@ -43,8 +43,22 @@ export class Engine {
       this.master.connect(this.actx.destination);
       for (const e of this.pool.values()) this.connect(e);
     }
-    if (this.actx.state === 'suspended') this.actx.resume();
+    if (this.actx.state !== 'running') this.actx.resume().catch(() => {});
     return this.actx;
+  }
+
+  // Called from a user gesture (iOS needs the context created/resumed inside one). Also plays one
+  // silent buffer, which is what finally unlocks Web Audio output on iOS Safari.
+  unlockAudio() {
+    const actx = this.ensureAudio();
+    if (!this.unlocked) {
+      this.unlocked = true;
+      const src = actx.createBufferSource();
+      src.buffer = actx.createBuffer(1, 1, 22050);
+      src.connect(actx.destination);
+      src.start(0);
+    }
+    for (const e of this.pool.values()) if (e.node && e.el.muted) e.el.muted = false;
   }
 
   connect(e) {
@@ -93,7 +107,10 @@ export class Engine {
       const el = document.createElement(m.kind === 'video' ? 'video' : 'audio');
       el.preload = 'auto';
       el.playsInline = true;
-      el.muted = true; // unmuted once routed through Web Audio
+      el.setAttribute('playsinline', '');
+      el.setAttribute('webkit-playsinline', '');
+      el.muted = true; // muted until routed through Web Audio (gain starts at 0), so iOS lets it play
+      el.defaultMuted = true;
       const redraw = () => { if (!this.playing) this.invalidate(); };
       el.addEventListener('seeked', redraw);
       el.addEventListener('loadeddata', redraw);
@@ -177,7 +194,10 @@ export class Engine {
         if (Math.abs(el.playbackRate - rate) > 1e-3) el.playbackRate = rate;
         if (el.paused) {
           if (Math.abs(el.currentTime - srcT) > 0.05) el.currentTime = srcT;
-          el.play().catch(() => {});
+          el.play().catch((err) => {
+            // Autoplay policy refused unmuted playback (no audio unlock yet): keep the picture going muted.
+            if (err?.name === 'NotAllowedError' && !el.muted) { el.muted = true; el.play().catch(() => {}); }
+          });
         } else if (!el.seeking && Math.abs(el.currentTime - srcT) > 0.3) el.currentTime = srcT;
       } else {
         if (!el.paused) el.pause();

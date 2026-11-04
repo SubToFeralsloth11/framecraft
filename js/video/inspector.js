@@ -3,6 +3,7 @@
 import { CONFIG } from '../config.js';
 import { License, requirePro } from '../license.js';
 import { el, toast } from '../ui.js';
+import { iconEl } from '../icons.js';
 import {
   clamp, clipEnd, propAt, keyIndex, setKey, removeKey, setSpeed, trimEnd, prevAdjacent, transDur, timecode,
   TRANSITIONS, TEXT_ANIMS, COLOR_DEFAULT, ASPECTS, KEY_PROPS, trackOf,
@@ -44,8 +45,18 @@ export class Inspector {
     const input = el('input', { type: 'range', min, max, step });
     const refresh = () => { const c = this.cur(); if (!c) return; const v = get(c); input.value = v; out.textContent = fmt(v); };
     input.addEventListener('input', () => { out.textContent = fmt(+input.value); this.edit(key, (c, p) => set(c, +input.value, p)); });
-    const lab = el('span', { title: reset != null ? 'Double-click to reset' : '' }, label);
-    if (reset != null) lab.addEventListener('dblclick', () => this.edit(key + ':reset', (c, p) => set(c, reset, p)));
+    const lab = el('span', { title: reset != null ? 'Double-click (double-tap) to reset' : '' }, label);
+    if (reset != null) {
+      const doReset = () => this.edit(key + ':reset', (c, p) => set(c, reset, p));
+      lab.addEventListener('dblclick', doReset);
+      // Touch browsers do not reliably fire dblclick: detect a double tap ourselves.
+      let lastTap = 0;
+      lab.addEventListener('pointerup', (e) => {
+        if (e.pointerType !== 'touch') return;
+        const now = performance.now();
+        if (now - lastTap < 350) { e.preventDefault(); doReset(); lastTap = 0; } else lastTap = now;
+      });
+    }
     this.updaters.push(refresh);
     refresh();
     return el('label', { class: 'field' + (extra ? ' vt-keyed' : '') }, lab, input, out, extra);
@@ -71,11 +82,11 @@ export class Inspector {
     return el('label', { class: 'field vt-check' }, el('span', {}, label), el('div', { class: 'row' }, i, badge), el('span'));
   }
 
-  // Range row for a keyframable property, with ◆ add/remove and ◀ ▶ navigation.
+  // Range row for a keyframable property, with keyframe add/remove and previous/next navigation.
   keyed(label, prop, opts) {
-    const diamond = el('button', { class: 'vt-kf', title: 'Add / remove keyframe at playhead' }, '◆');
-    const prev = el('button', { class: 'vt-kf nav', title: 'Previous keyframe' }, '◀');
-    const next = el('button', { class: 'vt-kf nav', title: 'Next keyframe' }, '▶');
+    const diamond = el('button', { class: 'vt-kf', title: 'Add / remove keyframe at playhead' }, iconEl('keyframe', 13));
+    const prev = el('button', { class: 'vt-kf nav', title: 'Previous keyframe' }, iconEl('chevronLeft', 13));
+    const next = el('button', { class: 'vt-kf nav', title: 'Next keyframe' }, iconEl('chevronRight', 13));
     const jump = (dir) => {
       const c = this.cur(), lt = this.lt(c), ks = c.keyframes[prop] || [];
       const k = dir < 0 ? [...ks].reverse().find((x) => x.t < lt - 1e-3) : ks.find((x) => x.t > lt + 1e-3);
@@ -165,7 +176,7 @@ export class Inspector {
     const t = (fn) => (c, v) => fn(c.text, v);
     const area = el('textarea', { rows: 3, value: this.cur().text.content, oninput: () => this.edit('content', (c) => { c.text.content = area.value; }) });
     const align = el('div', { class: 'row vt-seg' }, ['left', 'center', 'right'].map((a) => {
-      const b = el('button', { class: 'icon-btn', title: `Align ${a}`, onclick: () => this.edit('align' + a, (c) => { c.text.align = a; }) }, { left: '⇤', center: '↔', right: '⇥' }[a]);
+      const b = el('button', { class: 'icon-btn', title: `Align ${a}`, onclick: () => this.edit('align' + a, (c) => { c.text.align = a; }) }, iconEl({ left: 'alignLeft', center: 'alignCenter', right: 'alignRight' }[a], 16));
       this.updaters.push(() => b.classList.toggle('vt-on', this.cur()?.text.align === a));
       return b;
     }));
@@ -229,7 +240,7 @@ export class Inspector {
       for (const ks of Object.values(c.keyframes)) for (const k of ks) k.ease = v;
     });
     ease.querySelector('span').append(' ', pro() || '');
-    return this.section(['Transform ', el('span', { class: 'muted vt-small' }, '◆ keyframes '), pro()], true,
+    return this.section(['Transform ', el('span', { class: 'muted vt-small vt-kfhint' }, iconEl('keyframe', 11), 'keyframes '), pro()], true,
       this.keyed('Position X', 'x', { min: -0.5, max: 1.5, step: 0.001, fmt: pct, reset: 0.5 }),
       this.keyed('Position Y', 'y', { min: -0.5, max: 1.5, step: 0.001, fmt: pct, reset: 0.5 }),
       this.keyed('Scale', 'scale', { min: 0.05, max: 4, step: 0.01, fmt: pct, reset: 1 }),
@@ -297,19 +308,19 @@ export class Inspector {
     const list = c.effects.map((fx, i) => {
       const def = EFFECTS[fx.type];
       if (!def) return null;
-      const rm = el('button', { class: 'icon-btn', title: 'Remove effect', onclick: (e) => { e.preventDefault(); this.ed.store.mutate((p) => { p.clips.find((x) => x.id === c.id).effects.splice(i, 1); }); } }, '✕');
+      const rm = el('button', { class: 'icon-btn', title: 'Remove effect', onclick: (e) => { e.preventDefault(); this.ed.store.mutate((p) => { p.clips.find((x) => x.id === c.id).effects.splice(i, 1); }); } }, iconEl('close', 14));
       if (def.fixed) return el('div', { class: 'field' }, el('span', {}, def.name), el('span', { class: 'muted' }, 'on'), rm);
       return this.range(def.name, { min: 0, max: 100, key: 'fx' + fx.id, fmt: (v) => v + '%', get: (x) => x.effects[i]?.amount ?? 0, set: (x, v) => { if (x.effects[i]) x.effects[i].amount = v; }, extra: rm });
     });
     const add = el('select', { onchange: () => { if (add.value) this.ed.actions.applyEffect(c.id, add.value); } },
-      el('option', { value: '' }, '+ Add effect…'), Object.entries(EFFECTS).map(([k, f]) => el('option', { value: k }, `${f.icon} ${f.name}`)));
+      el('option', { value: '' }, 'Add effect…'), Object.entries(EFFECTS).map(([k, f]) => el('option', { value: k }, f.name)));
     return this.section(`Effects (${c.effects.length})`, true, ...list, el('div', { class: 'vt-pad' }, add),
-      c.effects.length ? null : el('div', { class: 'vt-pad muted vt-small' }, 'Or drag one from the Effects tab onto a clip.'));
+      c.effects.length ? null : el('div', { class: 'vt-pad muted vt-small' }, 'Or drag one from the Effects tab onto a clip (on touch: select the clip and tap the effect).'));
   }
 
   chromaSec() {
     const gate = () => requirePro('Chroma key (green screen)');
-    const pick = el('button', { class: 'btn', onclick: (e) => { e.preventDefault(); if (gate()) this.ed.pickColor(this.id); } }, '⌖ Pick from preview');
+    const pick = el('button', { class: 'btn', onclick: (e) => { e.preventDefault(); if (gate()) this.ed.pickColor(this.id); } }, iconEl('crosshair', 16), 'Pick from preview');
     return this.section(['Chroma key ', pro()], false,
       this.check('Enable', (c) => c.chroma.on, (v) => { if (v && !gate()) return false; this.edit('chroma-on', (c) => { c.chroma.on = v; }); }),
       this.color('Key color', (c) => c.chroma.color, (c, v) => { if (License.isPro()) c.chroma.color = v; }),
@@ -327,7 +338,7 @@ export class Inspector {
         el('button', { class: 'btn', onclick: () => actions.duplicate() }, 'Duplicate'),
         el('button', { class: 'btn', onclick: () => actions.copy() }, 'Copy'),
         el('button', { class: 'btn danger', onclick: () => actions.deleteSelected(false) }, 'Delete')),
-      el('p', { class: 'muted' }, 'Drag any selected clip to move them together. Shift-click to add or remove clips.'));
+      el('p', { class: 'muted' }, 'Drag any selected clip to move them together. Shift-click (or turn on Select multiple in the timeline bar) to add or remove clips.'));
   }
 
   project() {

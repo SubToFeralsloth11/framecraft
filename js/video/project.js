@@ -2,6 +2,7 @@
 // matches media already in the bin by name, then asks the user to relink anything missing.
 import { requirePro } from '../license.js';
 import { el, modal, toast, download, pickFiles } from '../ui.js';
+import { iconEl } from '../icons.js';
 import { ACCEPT, kindOf } from './media.js';
 import { normalize } from './model.js';
 
@@ -61,7 +62,7 @@ function relinkDialog(ed, missing, remap, finish) {
     for (const m of missing) {
       const ok = remap.has(m.id);
       const row = el('div', { class: 'vt-relink-row' + (ok ? ' ok' : '') },
-        el('span', {}, ok ? '✓' : '⚠'),
+        iconEl(ok ? 'check' : 'warn', 18),
         el('div', {}, el('div', {}, m.name), el('div', { class: 'muted vt-small' }, ok ? 'Linked' : `${m.kind} · missing`)),
         ok ? el('span') : el('button', { class: 'btn', onclick: () => locate([m]) }, 'Locate…'));
       list.append(row);

@@ -3,6 +3,7 @@
 import { CONFIG } from '../config.js';
 import { License, requirePro, drawWatermark } from '../license.js';
 import { el, modal, toast, download } from '../ui.js';
+import { iconEl } from '../icons.js';
 import { frameSize, timecode, FPS } from './model.js';
 
 const RESOLUTIONS = [
@@ -53,9 +54,9 @@ export function openExport(ed) {
     !pro && dur > end ? el('div', { class: 'vt-note warn' }, `Your timeline is ${timecode(dur)} long; the free export stops at ${timecode(end)}.`) : null,
     el('div', { class: 'muted vt-small' }, 'Export plays the timeline in real time. Keep this tab visible until it finishes.'),
     el('div', { class: 'row vt-wrap' },
-      el('button', { class: 'btn primary', disabled: !vMime, onclick: () => { dlg.close(); exportVideo(ed, opts(), vMime); } }, '⬇ Export video'),
-      el('button', { class: 'btn', onclick: () => { dlg.close(); exportFrame(ed, opts()); } }, '🖼 Current frame (PNG)'),
-      el('button', { class: 'btn', onclick: () => { dlg.close(); exportAudio(ed, opts()); } }, '♪ Audio only')));
+      el('button', { class: 'btn primary', disabled: !vMime, onclick: () => { dlg.close(); exportVideo(ed, opts(), vMime); } }, iconEl('download', 16), 'Export video'),
+      el('button', { class: 'btn', onclick: () => { dlg.close(); exportFrame(ed, opts()); } }, iconEl('image', 16), 'Current frame (PNG)'),
+      el('button', { class: 'btn', onclick: () => { dlg.close(); exportAudio(ed, opts()); } }, iconEl('music', 16), 'Audio only')));
   const dlg = modal('Export', body);
 }
 

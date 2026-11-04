@@ -82,6 +82,7 @@ async function probe(file, id) {
       el.preload = 'auto';
       el.muted = true;
       el.playsInline = true;
+      el.setAttribute('playsinline', '');
       el.src = url;
       await once(el, 'loadedmetadata');
       item.duration = await realDuration(el);
