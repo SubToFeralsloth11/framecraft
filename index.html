@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FrameCraft Studio: Photo & Video Editor in Your Browser</title>
+  <meta name="description" content="Edit photos and videos in your browser with layers, 40+ tools, filters, a multi-track timeline and 4K export. Nothing to install and nothing uploaded. Free to start.">
+  <meta property="og:title" content="FrameCraft Studio">
+  <meta property="og:description" content="A photo and video editor that runs in your browser. Free to start.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/landing.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="#"><span class="logo"></span>FrameCraft</a>
+    <nav><a href="#features">Features</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a></nav>
+    <a class="btn primary" href="app.html">Open the editor</a>
+  </header>
+
+  <section class="hero">
+    <h1>A photo and video editor<br><span class="grad">in your browser.</span></h1>
+    <p>Layers, brushes, selections, curves, a multi-track timeline, titles, transitions and 4K export. You don't install anything or create an account, and your files stay on your computer.</p>
+    <div class="cta">
+      <a class="btn primary big" href="app.html#photo">Edit a photo</a>
+      <a class="btn big" href="app.html#video">Edit a video</a>
+    </div>
+    <p class="small">Free forever plan · Pro from <b data-price="monthly"></b>/month · Cancel any time</p>
+  </section>
+
+  <section id="features" class="features">
+    <div class="card"><h3>🖌️ Pro-grade photo tools</h3><p>Layers with 16 blend modes, brush, clone stamp, healing-style smudge, dodge &amp; burn, magic wand, lasso, crop, gradient, shapes and text.</p></div>
+    <div class="card"><h3>🎚️ Real color control</h3><p>Levels, curves, hue/saturation, vibrance, temperature, color balance, plus one-click looks like Vivid, Noir and Vintage.</p></div>
+    <div class="card"><h3>🎬 Multi-track video timeline</h3><p>Trim, split, ripple delete, speed ramps, keyframes, fades and transitions. Stack video, images, titles and audio.</p></div>
+    <div class="card"><h3>🟩 Green screen</h3><p>Chroma key for photos and video. Remove a background by color in one click.</p></div>
+    <div class="card"><h3>✍️ Animated titles</h3><p>Fade, slide, typewriter and pop-in text with stroke, shadow and background boxes.</p></div>
+    <div class="card"><h3>🔒 Private by design</h3><p>All editing happens on your device. Nothing is uploaded and nobody sees your files.</p></div>
+  </section>
+
+  <section id="pricing" class="pricing">
+    <h2>Simple pricing</h2>
+    <div class="tiers">
+      <div class="tier">
+        <h3>Free</h3>
+        <div class="price">A$0</div>
+        <ul>
+          <li>Every core photo &amp; video tool</li>
+          <li>Up to 5 layers / 3 tracks</li>
+          <li>Photo export up to 1920px</li>
+          <li>Video export up to 720p, 60s</li>
+          <li class="no">Small watermark on exports</li>
+        </ul>
+        <a class="btn big" href="app.html">Start free</a>
+      </div>
+      <div class="tier best">
+        <span class="ribbon">Most popular</span>
+        <h3>Pro</h3>
+        <div class="price"><span data-price="monthly"></span><small>/month</small></div>
+        <div class="small">or <span data-price="yearly"></span>/year (save 27%)</div>
+        <ul>
+          <li>No watermark, ever</li>
+          <li>Full-resolution photos &amp; 4K video</li>
+          <li>Unlimited layers, tracks &amp; length</li>
+          <li>Curves, clone stamp, denoise, chroma key, keyframes</li>
+          <li>Save and reopen projects</li>
+        </ul>
+        <a class="btn primary big" id="buy-monthly" href="app.html">Go Pro monthly</a>
+        <a class="btn big" id="buy-yearly" href="app.html">Go Pro yearly</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq" class="faq">
+    <h2>FAQ</h2>
+    <details><summary>Do I need to install anything?</summary><p>No. FrameCraft runs in Chrome, Edge, Safari and Firefox on Mac, Windows and Chromebook.</p></details>
+    <details><summary>Are my files uploaded?</summary><p>No. Everything is processed on your device and your files never leave it.</p></details>
+    <details><summary>How do I activate Pro?</summary><p>After checkout you get a license key by email. Click <b>Upgrade to Pro</b> in the editor and paste it in.</p></details>
+    <details><summary>Can I cancel?</summary><p>Yes, any time. Pro stays active until the end of the period you paid for.</p></details>
+  </section>
+
+  <footer class="foot">© <span id="year"></span> FrameCraft Studio · <a href="app.html">Open editor</a> <span id="support"></span></footer>
+
+  <script type="module">
+    import { CONFIG } from './js/config.js';
+    document.querySelectorAll('[data-price]').forEach((n) => { n.textContent = n.dataset.price === 'yearly' ? CONFIG.priceYearly : CONFIG.priceMonthly; });
+    if (CONFIG.stripeMonthlyLink) document.getElementById('buy-monthly').href = CONFIG.stripeMonthlyLink;
+    if (CONFIG.stripeYearlyLink) document.getElementById('buy-yearly').href = CONFIG.stripeYearlyLink;
+    if (CONFIG.supportEmail) document.getElementById('support').innerHTML = `· <a href="mailto:${CONFIG.supportEmail}">Support</a>`;
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
